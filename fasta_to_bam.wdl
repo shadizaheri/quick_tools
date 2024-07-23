@@ -45,11 +45,12 @@ workflow FastaToBamWorkflow {
         File ref_fasta
         File ref_fasta_index
         File ref_dict
-        String prefix = "output"
         Int cpu = 2
         String memory = "8G"
         String disks = "local-disk 100 HDD"
     }
+
+    String prefix = basename(fasta, ".fasta")
 
     call FastaToBam {
         input:

@@ -29,7 +29,7 @@ task FastaToBam {
     }
 
     runtime {
-        docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
+        docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
         cpu: cpu
         memory: memory
         disks: disks

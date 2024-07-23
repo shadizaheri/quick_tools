@@ -17,7 +17,10 @@ task FastaToBam {
 
         # Align FASTA to reference using minimap2 and convert to BAM using samtools
         minimap2 -ax map-ont ~{ref_fasta} ~{fasta} | \
-        samtools view -Sb - > ~{prefix}.bam
+        samtools view -Sb - > ~{prefix}.unsorted.bam
+
+        # Sort the BAM file
+        samtools sort ~{prefix}.unsorted.bam -o ~{prefix}.bam
 
         # Index the BAM file
         samtools index ~{prefix}.bam

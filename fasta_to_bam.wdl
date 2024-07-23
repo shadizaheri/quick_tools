@@ -16,7 +16,7 @@ task FastaToBam {
         set -euxo pipefail
 
         # Align FASTA to reference using minimap2 and convert to BAM using samtools
-        minimap2 -ax map-ont ~{ref_fasta} ~{fasta} | \
+        minimap2 -ax asm5 ~{ref_fasta} ~{fasta} | \
         samtools view -Sb - > ~{prefix}.unsorted.bam
 
         # Sort the BAM file

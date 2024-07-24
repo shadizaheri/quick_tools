@@ -1,5 +1,34 @@
 version 1.0
+workflow FastaToBamWorkflow {
+    input {
+        File fasta
+        File ref_fasta
+        File ref_fasta_index
+        File ref_dict
+        Int cpu = 2
+        String memory = "8G"
+        String disks = "local-disk 100 HDD"
+    }
 
+    String prefix = basename(fasta, ".fasta")
+
+    call FastaToBam {
+        input:
+            fasta = fasta,
+            ref_fasta = ref_fasta,
+            ref_fasta_index = ref_fasta_index,
+            ref_dict = ref_dict,
+            prefix = prefix,
+            cpu = cpu,
+            memory = memory,
+            disks = disks
+    }
+
+    output {
+        File bam = FastaToBam.bam
+        File bai = FastaToBam.bai
+    }
+}
 task FastaToBam {
     input {
         File fasta
@@ -39,33 +68,4 @@ task FastaToBam {
     }
 }
 
-workflow FastaToBamWorkflow {
-    input {
-        File fasta
-        File ref_fasta
-        File ref_fasta_index
-        File ref_dict
-        Int cpu = 2
-        String memory = "8G"
-        String disks = "local-disk 100 HDD"
-    }
 
-    String prefix = basename(fasta, ".fasta")
-
-    call FastaToBam {
-        input:
-            fasta = fasta,
-            ref_fasta = ref_fasta,
-            ref_fasta_index = ref_fasta_index,
-            ref_dict = ref_dict,
-            prefix = prefix,
-            cpu = cpu,
-            memory = memory,
-            disks = disks
-    }
-
-    output {
-        File bam = FastaToBam.bam
-        File bai = FastaToBam.bai
-    }
-}

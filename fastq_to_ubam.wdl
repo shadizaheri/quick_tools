@@ -22,9 +22,8 @@ workflow FastqToSamWorkflow {
         String read_group_name
         String sample_name
         String library_name
-        String platform_unit
         String platform
-        RuntimeAttr runtime_attrs
+        RuntimeAttr? runtime_attrs
     }
 
     call FastqToSam {
@@ -33,9 +32,8 @@ workflow FastqToSamWorkflow {
             read_group_name = read_group_name,
             sample_name = sample_name,
             library_name = library_name,
-            platform_unit = platform_unit,
             platform = platform,
-            runtime_attrs = runtime_attrs
+            runtime_attrs = select_first([runtime_attrs, default_runtime_attrs()])
     }
 
     output {
@@ -49,7 +47,6 @@ task FastqToSam {
         String read_group_name
         String sample_name
         String library_name
-        String platform_unit
         String platform
         RuntimeAttr runtime_attrs
     }
@@ -61,7 +58,6 @@ task FastqToSam {
             READ_GROUP_NAME=${read_group_name} \
             SAMPLE_NAME=${sample_name} \
             LIBRARY_NAME=${library_name} \
-            PLATFORM_UNIT=${platform_unit} \
             PLATFORM=${platform}
     }
 
@@ -77,5 +73,18 @@ task FastqToSam {
         bootDiskSizeGb: runtime_attrs.boot_disk_gb
         preemptible: runtime_attrs.preemptible_tries
         maxRetries: runtime_attrs.max_retries
+    }
+}
+
+# Function to provide default runtime attributes
+function default_runtime_attrs() {
+    return {
+        mem_gb: 4.0,
+        cpu_cores: 2,
+        disk_gb: 50,
+        boot_disk_gb: 10,
+        preemptible_tries: 3,
+        max_retries: 2,
+        docker: "broadinstitute/gatk:latest"
     }
 }

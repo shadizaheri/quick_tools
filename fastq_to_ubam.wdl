@@ -10,11 +10,6 @@ struct RuntimeAttr {
     String? docker
 }
 
-struct DataTypeParameters {
-    Int num_shards
-    String map_preset
-}
-
 workflow FastqToSamWorkflow {
     input {
         String sample_id
@@ -33,7 +28,7 @@ workflow FastqToSamWorkflow {
             sample_name = sample_name,
             library_name = library_name,
             platform = platform,
-            runtime_attrs = select_first([runtime_attrs, default_runtime_attrs()])
+            runtime_attrs = runtime_attrs
     }
 
     output {
@@ -48,8 +43,9 @@ task FastqToSam {
         String sample_name
         String library_name
         String platform
-        RuntimeAttr runtime_attrs
+        RuntimeAttr? runtime_attrs
     }
+    Int disk_size = 32
 
     command {
         java -jar picard.jar FastqToSam \
@@ -65,26 +61,25 @@ task FastqToSam {
         File ubam_file = "${sample_name}.unaligned.bam"
     }
 
+    #########################
+    RuntimeAttr default_attr = object {
+        cpu_cores:          4,
+        mem_gb:             20,
+        disk_gb:            disk_size,
+        boot_disk_gb:       10,
+        preemptible_tries:  0,
+        max_retries:        1,
+        docker:             "broadinstitute/gatk:latest"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
     runtime {
-        docker: runtime_attrs.docker
-        memory: "${runtime_attrs.mem_gb} GB"
-        cpu: runtime_attrs.cpu_cores
-        disks: "local-disk ${runtime_attrs.disk_gb} HDD"
-        bootDiskSizeGb: runtime_attrs.boot_disk_gb
-        preemptible: runtime_attrs.preemptible_tries
-        maxRetries: runtime_attrs.max_retries
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
-}
 
-# Function to provide default runtime attributes
-function default_runtime_attrs() {
-    return {
-        mem_gb: 4.0,
-        cpu_cores: 2,
-        disk_gb: 50,
-        boot_disk_gb: 10,
-        preemptible_tries: 3,
-        max_retries: 2,
-        docker: "broadinstitute/gatk:latest"
-    }
 }

@@ -48,7 +48,7 @@ task FastqToSam {
     Int disk_size = 32
 
     command {
-        java -jar picard.jar FastqToSam \
+        java -jar /usr/picard/picard.jar FastqToSam \
             FASTQ=${fastq_file} \
             OUTPUT=${sample_name}.unaligned.bam \
             READ_GROUP_NAME=${read_group_name} \
@@ -69,7 +69,7 @@ task FastqToSam {
         boot_disk_gb:       10,
         preemptible_tries:  0,
         max_retries:        1,
-        docker:             "broadinstitute/gatk:latest"
+        docker:                "us.gcr.io/broad-dsp-lrma/picard:lrfp-clr"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
     runtime {

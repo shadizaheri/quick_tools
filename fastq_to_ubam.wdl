@@ -31,8 +31,16 @@ workflow FastqToSamWorkflow {
             runtime_attrs = runtime_attrs
     }
 
+    call IndexBam {
+        input:
+            bam_file = FastqToSam.ubam_file,
+            sample_name = sample_name,
+            runtime_attrs = runtime_attrs
+    }
+
     output {
         File ubam_file = FastqToSam.ubam_file
+        File bam_index = IndexBam.bai_file
     }
 }
 
@@ -61,7 +69,6 @@ task FastqToSam {
         File ubam_file = "${sample_name}.unaligned.bam"
     }
 
-    #########################
     RuntimeAttr default_attr = object {
         cpu_cores:          4,
         mem_gb:             20,
@@ -82,4 +89,41 @@ task FastqToSam {
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 
+}
+
+task IndexBam {
+    input {
+        File bam_file
+        String sample_name
+        RuntimeAttr? runtime_attrs
+    }
+    Int disk_size = 10
+
+    command {
+        samtools index ${bam_file}
+    }
+
+    output {
+        File bai_file = "${bam_file}.bai"
+    }
+
+    RuntimeAttr default_attr = object {
+        cpu_cores:          2,
+        mem_gb:             4,
+        disk_gb:            disk_size,
+        boot_disk_gb:       5,
+        preemptible_tries:  0,
+        max_retries:        1,
+        docker:                "biocontainers/samtools:v1.9-4-deb_cv1"
+    }
+    RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
+    runtime {
+        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+    }
 }

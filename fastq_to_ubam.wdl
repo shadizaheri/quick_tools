@@ -97,7 +97,7 @@ task IndexBam {
         String sample_name
         RuntimeAttr? runtime_attrs
     }
-    Int disk_size = 10
+    Int disk_size = 15  # Increased from 10 to 15 to be larger than the image size
 
     command {
         samtools index ${bam_file}
@@ -112,10 +112,10 @@ task IndexBam {
         cpu_cores:          2,
         mem_gb:             4,
         disk_gb:            disk_size,
-        boot_disk_gb:       5,
+        boot_disk_gb:       15,  # Updated to be consistent with disk_size
         preemptible_tries:  0,
         max_retries:        1,
-        docker:                "biocontainers/samtools:v1.9-4-deb_cv1"
+        docker:             "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
     runtime {
@@ -128,3 +128,4 @@ task IndexBam {
         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
     }
 }
+

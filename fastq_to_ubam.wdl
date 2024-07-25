@@ -101,10 +101,11 @@ task IndexBam {
 
     command {
         samtools index ${bam_file}
+        mv ${bam_file}.bai ${sample_name}.unaligned.bam.bai
     }
 
     output {
-        File bai_file = "${bam_file}.bai"
+        File bai_file = "${sample_name}.unaligned.bam.bai"
     }
 
     RuntimeAttr default_attr = object {

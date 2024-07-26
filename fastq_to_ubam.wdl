@@ -1,131 +1,97 @@
 version 1.0
 
-struct RuntimeAttr {
-    Float? mem_gb
-    Int? cpu_cores
-    Int? disk_gb
-    Int? boot_disk_gb
-    Int? preemptible_tries
-    Int? max_retries
-    String? docker
-}
-
-workflow FastqToSamWorkflow {
+workflow FastqToBamWorkflow {
     input {
-        String sample_id
-        File fastq_file
-        String read_group_name
-        String sample_name
-        String library_name
-        String platform
-        RuntimeAttr? runtime_attrs
+        File fastq
+        File ref_fasta
+        File ref_fasta_index
+        File ref_dict
+        Int cpu = 2
+        String memory = "16G"  # Increased memory allocation
+        String disks = "local-disk 200 HDD"  # Increased disk allocation
+        Int? num_threads
+        Int? num_sort_threads
     }
 
-    call FastqToSam {
+    String prefix = if fastq.endsWith(".fastq.gz") then basename(fastq, ".fastq.gz") else basename(fastq, ".fastq")
+
+    call FastqToBam {
         input:
-            fastq_file = fastq_file,
-            read_group_name = read_group_name,
-            sample_name = sample_name,
-            library_name = library_name,
-            platform = platform,
-            runtime_attrs = runtime_attrs
-    }
-
-    call IndexBam {
-        input:
-            bam_file = FastqToSam.ubam_file,
-            sample_name = sample_name,
-            runtime_attrs = runtime_attrs
+            fastq = fastq,
+            ref_fasta = ref_fasta,
+            ref_fasta_index = ref_fasta_index,
+            ref_dict = ref_dict,
+            prefix = prefix,
+            cpu = cpu,
+            memory = memory,
+            disks = disks,
+            num_threads = select_first([num_threads, 16]),
+            num_sort_threads = select_first([num_sort_threads, 4])
     }
 
     output {
-        File ubam_file = FastqToSam.ubam_file
-        File bam_index = IndexBam.bai_file
+        File bam = FastqToBam.bam
+        File bai = FastqToBam.bai
     }
 }
 
-task FastqToSam {
+task FastqToBam {
     input {
-        File fastq_file
-        String read_group_name
-        String sample_name
-        String library_name
-        String platform
-        RuntimeAttr? runtime_attrs
-    }
-    Int disk_size = 32
-
-    command {
-        java -jar /usr/picard/picard.jar FastqToSam \
-            FASTQ=${fastq_file} \
-            OUTPUT=${sample_name}.unaligned.bam \
-            READ_GROUP_NAME=${read_group_name} \
-            SAMPLE_NAME=${sample_name} \
-            LIBRARY_NAME=${library_name} \
-            PLATFORM=${platform}
+        File fastq
+        File ref_fasta
+        File ref_fasta_index
+        File ref_dict
+        String prefix
+        Int cpu = 2
+        String memory = "16G"
+        String disks = "local-disk 200 HDD"
+        Int num_threads = 16
+        Int num_sort_threads = 4
     }
 
-    output {
-        File ubam_file = "${sample_name}.unaligned.bam"
-    }
+    command <<<
+        set -euxo pipefail
 
-    RuntimeAttr default_attr = object {
-        cpu_cores:          4,
-        mem_gb:             20,
-        disk_gb:            disk_size,
-        boot_disk_gb:       10,
-        preemptible_tries:  0,
-        max_retries:        1,
-        docker:                "us.gcr.io/broad-dsp-lrma/picard:lrfp-clr"
-    }
-    RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
-    runtime {
-        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
-        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-    }
+        # Check inputs
+        ls -lh ~{fastq}
+        ls -lh ~{ref_fasta}
+        ls -lh ~{ref_fasta_index}
+        ls -lh ~{ref_dict}
 
-}
+        # Align FASTQ to reference using minimap2 and save to temporary file
+        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fastq} > ~{prefix}.sam 2> ~{prefix}.minimap2.log
 
-task IndexBam {
-    input {
-        File bam_file
-        String sample_name
-        RuntimeAttr? runtime_attrs
-    }
-    Int disk_size = 15  # Increased from 10 to 15 to be larger than the image size
+        # Check if minimap2 succeeded
+        if [ $? -ne 0 ]; then
+            echo "minimap2 failed. Check the log file ~{prefix}.minimap2.log for details." >&2
+            cat ~{prefix}.minimap2.log
+            exit 1
+        fi
 
-    command {
-        samtools index ${bam_file}
-        mv ${bam_file}.bai ${sample_name}.unaligned.bam.bai
-    }
+        # Output the first few lines of the SAM file for debugging
+        head -n 50 ~{prefix}.sam
+
+        # Convert SAM to BAM and sort
+        samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam ~{prefix}.sam
+
+        # Verify BAM file
+        ls -lh ~{prefix}.bam
+
+        # Index the BAM file
+        samtools index ~{prefix}.bam
+    >>>
 
     output {
-        File bai_file = "${sample_name}.unaligned.bam.bai"
+        File bam = "~{prefix}.bam"
+        File bai = "~{prefix}.bam.bai"
+        File minimap2_log = "~{prefix}.minimap2.log"
+        File sam = "~{prefix}.sam"
     }
 
-    RuntimeAttr default_attr = object {
-        cpu_cores:          2,
-        mem_gb:             4,
-        disk_gb:            disk_size,
-        boot_disk_gb:       15,  # Updated to be consistent with disk_size
-        preemptible_tries:  0,
-        max_retries:        1,
-        docker:             "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
-    }
-    RuntimeAttr runtime_attr = select_first([runtime_attrs, default_attr])
     runtime {
-        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
-        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+        docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
+        cpu: cpu
+        memory: memory
+        disks: disks
     }
 }
-

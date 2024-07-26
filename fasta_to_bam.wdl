@@ -1,4 +1,5 @@
 version 1.0
+
 workflow FastaToBamWorkflow {
     input {
         File fasta
@@ -8,6 +9,8 @@ workflow FastaToBamWorkflow {
         Int cpu = 2
         String memory = "8G"
         String disks = "local-disk 100 HDD"
+        Int? num_threads
+        Int? num_sort_threads
     }
 
     String prefix = basename(fasta, ".fasta")
@@ -21,7 +24,9 @@ workflow FastaToBamWorkflow {
             prefix = prefix,
             cpu = cpu,
             memory = memory,
-            disks = disks
+            disks = disks,
+            num_threads = select_first([num_threads, 16]),
+            num_sort_threads = select_first([num_sort_threads, 4])
     }
 
     output {
@@ -29,6 +34,7 @@ workflow FastaToBamWorkflow {
         File bai = FastaToBam.bai
     }
 }
+
 task FastaToBam {
     input {
         File fasta
@@ -39,17 +45,16 @@ task FastaToBam {
         Int cpu = 2
         String memory = "8G"
         String disks = "local-disk 100 HDD"
+        Int num_threads = 16
+        Int num_sort_threads = 4
     }
 
     command <<<
         set -euxo pipefail
 
         # Align FASTA to reference using minimap2 and convert to BAM using samtools
-        minimap2 -ax asm5 ~{ref_fasta} ~{fasta} | \
-        samtools view -Sb - > ~{prefix}.unsorted.bam
-
-        # Sort the BAM file
-        samtools sort ~{prefix}.unsorted.bam -o ~{prefix}.bam
+        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} | \
+        samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam
 
         # Index the BAM file
         samtools index ~{prefix}.bam
@@ -67,5 +72,3 @@ task FastaToBam {
         disks: disks
     }
 }
-
-

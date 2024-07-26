@@ -7,8 +7,8 @@ workflow FastaToBamWorkflow {
         File ref_fasta_index
         File ref_dict
         Int cpu = 2
-        String memory = "16G"  # Increased memory allocation
-        String disks = "local-disk 200 HDD"  # Increased disk allocation
+        String memory = "8G"
+        String disks = "local-disk 100 HDD"
         Int? num_threads
         Int? num_sort_threads
     }
@@ -43,8 +43,8 @@ task FastaToBam {
         File ref_dict
         String prefix
         Int cpu = 2
-        String memory = "16G"
-        String disks = "local-disk 200 HDD"
+        String memory = "8G"
+        String disks = "local-disk 100 HDD"
         Int num_threads = 16
         Int num_sort_threads = 4
     }
@@ -59,17 +59,7 @@ task FastaToBam {
         ls -lh ~{ref_dict}
 
         # Align FASTA to reference using minimap2 and save to temporary file
-        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} > ~{prefix}.sam 2> ~{prefix}.minimap2.log
-
-        # Check if minimap2 succeeded
-        if [ $? -ne 0 ]; then
-            echo "minimap2 failed. Check the log file ~{prefix}.minimap2.log for details." >&2
-            cat ~{prefix}.minimap2.log
-            exit 1
-        fi
-
-        # Output the first few lines of the SAM file for debugging
-        head -n 50 ~{prefix}.sam
+        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} > ~{prefix}.sam
 
         # Convert SAM to BAM and sort
         samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam ~{prefix}.sam
@@ -84,8 +74,6 @@ task FastaToBam {
     output {
         File bam = "~{prefix}.bam"
         File bai = "~{prefix}.bam.bai"
-        File minimap2_log = "~{prefix}.minimap2.log"
-        File sam = "~{prefix}.sam"
     }
 
     runtime {

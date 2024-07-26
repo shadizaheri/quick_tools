@@ -1,8 +1,8 @@
 version 1.0
 
-workflow FastaToBamWorkflow {
+workflow FastqToBamWorkflow {
     input {
-        File fasta
+        File fastq
         File ref_fasta
         File ref_fasta_index
         File ref_dict
@@ -13,11 +13,11 @@ workflow FastaToBamWorkflow {
         Int? num_sort_threads
     }
 
-    String prefix = basename(fasta, ".fasta")
+    String prefix = basename(fastq, ".fastq")
 
-    call FastaToBam {
+    call FastqToBam {
         input:
-            fasta = fasta,
+            fastq = fastq,
             ref_fasta = ref_fasta,
             ref_fasta_index = ref_fasta_index,
             ref_dict = ref_dict,
@@ -30,14 +30,14 @@ workflow FastaToBamWorkflow {
     }
 
     output {
-        File bam = FastaToBam.bam
-        File bai = FastaToBam.bai
+        File bam = FastqToBam.bam
+        File bai = FastqToBam.bai
     }
 }
 
-task FastaToBam {
+task FastqToBam {
     input {
-        File fasta
+        File fastq
         File ref_fasta
         File ref_fasta_index
         File ref_dict
@@ -53,13 +53,13 @@ task FastaToBam {
         set -euxo pipefail
 
         # Check inputs
-        ls -lh ~{fasta}
+        ls -lh ~{fastq}
         ls -lh ~{ref_fasta}
         ls -lh ~{ref_fasta_index}
         ls -lh ~{ref_dict}
 
-        # Align FASTA to reference using minimap2 and save to temporary file
-        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} > ~{prefix}.sam 2> ~{prefix}.minimap2.log
+        # Align FASTQ to reference using minimap2 and save to temporary file
+        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fastq} > ~{prefix}.sam 2> ~{prefix}.minimap2.log
 
         # Check if minimap2 succeeded
         if [ $? -ne 0 ]; then

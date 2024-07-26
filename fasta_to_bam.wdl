@@ -58,9 +58,11 @@ task FastaToBam {
         ls -lh ~{ref_fasta_index}
         ls -lh ~{ref_dict}
 
-        # Align FASTA to reference using minimap2 and convert to BAM using samtools
-        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} | \
-        samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam
+        # Align FASTA to reference using minimap2 and save to temporary file
+        minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} > ~{prefix}.sam
+
+        # Convert SAM to BAM and sort
+        samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam ~{prefix}.sam
 
         # Verify BAM file
         ls -lh ~{prefix}.bam

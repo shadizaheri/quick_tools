@@ -52,9 +52,18 @@ task FastaToBam {
     command <<<
         set -euxo pipefail
 
+        # Check inputs
+        ls -lh ~{fasta}
+        ls -lh ~{ref_fasta}
+        ls -lh ~{ref_fasta_index}
+        ls -lh ~{ref_dict}
+
         # Align FASTA to reference using minimap2 and convert to BAM using samtools
         minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fasta} | \
         samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.bam
+
+        # Verify BAM file
+        ls -lh ~{prefix}.bam
 
         # Index the BAM file
         samtools index ~{prefix}.bam

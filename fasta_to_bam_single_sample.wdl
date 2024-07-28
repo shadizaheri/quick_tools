@@ -14,7 +14,7 @@ workflow FastqToBamWorkflow {
         String sample_id
         String read_group_id = "rg1"
         String read_group_lb = sample_id
-        String read_group_pl = "ILLUMINA"
+        String read_group_pl = "illumina"
         String read_group_sm = sample_id
     }
 

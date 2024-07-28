@@ -12,7 +12,8 @@ workflow FastqToBamWorkflow {
         Int? num_threads
         Int? num_sort_threads
         String sample_id
-        String read_group_id = "rg1"
+        String read_group_prefix = "srg1"
+        String read_group_id = read_group_prefix + "_" + sample_id
         String read_group_lb = sample_id
         String read_group_pl = "illumina"
         String read_group_sm = sample_id
@@ -88,7 +89,7 @@ task FastqToBam {
         samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.sorted.bam ~{prefix}.sam
 
         # Add read groups using picard
-        picard AddOrReplaceReadGroups \
+        java -jar /usr/picard/picard.jar AddOrReplaceReadGroups \
             I=~{prefix}.sorted.bam \
             O=~{prefix}_with_RG.bam \
             RGID=~{read_group_id} \

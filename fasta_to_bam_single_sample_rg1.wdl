@@ -12,8 +12,7 @@ workflow FastqToBamWorkflow {
         Int? num_threads
         Int? num_sort_threads
         String sample_id
-        String read_group_prefix = "srg1"
-        String read_group_id = read_group_prefix + "_" + sample_id
+        String read_group_id = "rg1"
         String read_group_lb = sample_id
         String read_group_pl = "illumina"
         String read_group_sm = sample_id
@@ -45,6 +44,7 @@ workflow FastqToBamWorkflow {
     }
 }
 
+
 task FastqToBam {
     input {
         File fastq
@@ -66,13 +66,16 @@ task FastqToBam {
     command <<<
         set -euxo pipefail
 
+        # Check inputs
         ls -lh ~{fastq}
         ls -lh ~{ref_fasta}
         ls -lh ~{ref_fasta_index}
         ls -lh ~{ref_dict}
 
+        # Align FASTQ to reference using minimap2 and save to temporary file
         minimap2 -ayYL --MD -eqx -x map-hifi -t~{num_threads} ~{ref_fasta} ~{fastq} > ~{prefix}.sam 2> ~{prefix}.minimap2.log
 
+        # Check if minimap2 succeeded
         if [ $? -ne 0 ]; then
             echo "minimap2 failed. Check the log file ~{prefix}.minimap2.log for details." >&2
             cat ~{prefix}.minimap2.log
@@ -83,12 +86,10 @@ task FastqToBam {
 
         samtools addreplacerg -r "ID:~{read_group_id}" -r "LB:~{read_group_lb}" -r "PL:~{read_group_pl}" -r "SM:~{read_group_sm}" -O BAM -o ~{prefix}.rg.bam ~{prefix}.sam
 
-        # Sort the BAM file
         samtools sort -@~{num_sort_threads} --no-PG -o ~{prefix}.sorted.bam ~{prefix}.rg.bam
 
         ls -lh ~{prefix}.sorted.bam
 
-        # Index the BAM file
         samtools index ~{prefix}.sorted.bam
     >>>
 

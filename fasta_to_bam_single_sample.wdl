@@ -1,7 +1,5 @@
 version 1.0
 
-version 1.0
-
 workflow FastqToBamWorkflow {
     input {
         File fastq

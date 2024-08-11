@@ -3,31 +3,26 @@ version 1.0
 workflow SplitVCFWorkflow {
     input {
         File joint_vcf
-        Array[String] regions
         Array[String] sample_names
     }
 
-    scatter (region in regions) {
-        scatter (samplename in sample_names) {
-            call SplitVCFbySample {
-                input:
-                    joint_vcf = joint_vcf,
-                    region = region,
-                    sample_name = samplename
-            }
+    scatter (samplename in sample_names) {
+        call SplitVCFbySample {
+            input:
+                joint_vcf = joint_vcf,
+                sample_name = samplename
         }
     }
 
     output {
-        Array[File] single_sample_vcfs = flatten(SplitVCFbySample.single_sample_vcf)
-        Array[File] single_sample_vcf_tbis = flatten(SplitVCFbySample.single_sample_vcf_tbi)
+        Array[File] single_sample_vcfs = SplitVCFbySample.single_sample_vcf
+        Array[File] single_sample_vcf_tbis = SplitVCFbySample.single_sample_vcf_tbi
     }
 }
 
 task SplitVCFbySample {
     input {
         File joint_vcf
-        String region
         String sample_name
     }
 
@@ -36,7 +31,7 @@ task SplitVCFbySample {
 
         bcftools index ${joint_vcf}
 
-        bcftools view -s ${sample_name} ${joint_vcf} -r ${region} -o ${sample_name}.subset.g.vcf.gz
+        bcftools view -s ${sample_name} ${joint_vcf} -o ${sample_name}.subset.g.vcf.gz
 
         tabix -p vcf ${sample_name}.subset.g.vcf.gz
     >>>

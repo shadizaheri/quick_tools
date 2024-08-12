@@ -1,26 +1,4 @@
-version 1.0
-
-workflow ExtractSampleVCFFromJointVCFFWorkflow {
-    input {
-        File joint_vcf
-        Array[String] sample_names
-    }
-
-    scatter (samplename in sample_names) {
-        call ExtractSampleVCFFromJointVCF {
-            input:
-                joint_vcf = joint_vcf,
-                sample_name = samplename
-        }
-    }
-
-    output {
-        Array[File] single_sample_vcfs = ExtractSampleVCFFromJointVCF.single_sample_vcf
-        Array[File] single_sample_vcf_tbis = ExtractSampleVCFFromJointVCF.single_sample_vcf_tbi
-    }
-}
-
-task ExtractSampleVCFFromJointVCF {
+task ExtractAndFilterSampleVCF {
     input {
         File joint_vcf
         String sample_name
@@ -33,12 +11,17 @@ task ExtractSampleVCFFromJointVCF {
 
         bcftools view -s ~{sample_name} ~{joint_vcf} -o ~{sample_name}.subset.g.vcf.gz
 
+        bcftools view -s ~{sample_name} -i 'GT="0/0"' ~{joint_vcf} -o ~{sample_name}.homref.g.vcf.gz
+
         tabix -p vcf ~{sample_name}.subset.g.vcf.gz
+        tabix -p vcf ~{sample_name}.homref.g.vcf.gz
     >>>
 
     output {
         File single_sample_vcf = "${sample_name}.subset.g.vcf.gz"
         File single_sample_vcf_tbi = "${sample_name}.subset.g.vcf.gz.tbi"
+        File homref_sample_vcf = "${sample_name}.homref.g.vcf.gz"
+        File homref_sample_vcf_tbi = "${sample_name}.homref.g.vcf.gz.tbi"
     }
 
     runtime {

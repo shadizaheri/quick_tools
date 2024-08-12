@@ -31,16 +31,12 @@ task ExtractAndFilterSampleVCF {
     command <<<
         set -euxo pipefail
 
-        # Index the joint VCF file
         bcftools index ~{joint_vcf}
 
-        # Extract the single sample VCF
         bcftools view -s ~{sample_name} ~{joint_vcf} -o ~{sample_name}.subset.g.vcf.gz
 
-        # Extract the single sample VCF and filter for hom/ref genotypes
         bcftools view -s ~{sample_name} -i 'GT="0/0"' ~{joint_vcf} -o ~{sample_name}.homref.g.vcf.gz
 
-        # Index both output VCFs
         tabix -p vcf ~{sample_name}.subset.g.vcf.gz
         tabix -p vcf ~{sample_name}.homref.g.vcf.gz
     >>>

@@ -35,7 +35,7 @@ task ExtractAndFilterSampleVCF {
 
         bcftools view -s ~{sample_name} ~{joint_vcf} -o ~{sample_name}.subset.g.vcf.gz
 
-        bcftools view -s ~{sample_name} -i 'GT="0/0"' ~{joint_vcf} -o ~{sample_name}.homref.g.vcf.gz
+        bcftools view -s ~{sample_name} -i 'GT="0/0"' ~{joint_vcf} -Oz -o ~{sample_name}.homref.g.vcf.gz
 
         tabix -p vcf ~{sample_name}.subset.g.vcf.gz
         tabix -p vcf ~{sample_name}.homref.g.vcf.gz

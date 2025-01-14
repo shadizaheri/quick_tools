@@ -57,10 +57,9 @@ task fastqc {
     }
 
     output {
-        Array[File] reports = glob("fastqc_output/*.html")  
-        Array[File] zips = glob("fastqc_output/*.zip")      
-        File report1 = reports[0]  # First HTML report
-        File report2 = reports[1]  # Second HTML report (if exists)
+        File report1 = glob("fastqc_output/*.html")[0]  # First report
+        File report2 = glob("fastqc_output/*.html")[1]  # Second report
+        File zipped = glob("fastqc_output/*.zip")[0]    # First zip file
     }
 
     runtime {

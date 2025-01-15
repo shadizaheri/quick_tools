@@ -58,11 +58,10 @@ task run_fastqc {
 
     # Outputs
     output {
-        File fastqc_zip = "${basename(fastq)}_fastqc.zip"
-        File fastqc_html = "${basename(fastq)}_fastqc.html"
+        File fastqc_html = "${basename(fastq)}_fastqc.html"  # HTML report only
     }
     meta {
-      author: "Shadi Zaheri"
-      description: "Run FastQC to perform quality control on FASTQ files"
+        author: "Shadi Zaheri"
+        description: "Run FastQC to perform quality control on FASTQ files"
     }
 }

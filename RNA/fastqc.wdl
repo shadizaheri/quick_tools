@@ -1,4 +1,5 @@
 version 1.0
+
 workflow fastqc_workflow {
     input {
         File fastq1                     
@@ -20,7 +21,8 @@ workflow fastqc_workflow {
     }
 
     output {
-        Array[File] reports = fastqc.reports
+        File report1 = fastqc.report1
+        File? report2 = fastqc.report2
         Array[File] zips = fastqc.zips
     }
 }
@@ -45,8 +47,8 @@ task fastqc {
         fastqc \
             --outdir fastqc_output \
             --threads ${num_threads} \
-            ${fastq1} ${"-" + fastq2}
-
+            ${fastq1} ${if defined(fastq2) then fastq2 else ""}
+        
         # Rename outputs with the specified prefix
         for report in fastqc_output/*.html; do
             mv $report fastqc_output/${output_prefix}_$(basename $report)
@@ -58,8 +60,8 @@ task fastqc {
 
     output {
         File report1 = glob("fastqc_output/*.html")[0]  # First report
-        File report2 = glob("fastqc_output/*.html")[1]  # Second report
-        File zipped = glob("fastqc_output/*.zip")[0]    # First zip file
+        File? report2 = select_first([glob("fastqc_output/*.html")[1], ""]) # Second report or empty
+        Array[File] zips = glob("fastqc_output/*.zip")  # All zip files
     }
 
     runtime {
@@ -74,4 +76,3 @@ task fastqc {
         description: "Run FastQC to perform quality control on FASTQ files"
     }
 }
-

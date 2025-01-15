@@ -45,7 +45,7 @@ task run_fastqc {
 
     # Command to run FastQC
     command {
-        fastqc ${fastq} --outdir=.
+        fastqc ${fastq} --threads ${num_threads}
     }
 
     # Runtime settings

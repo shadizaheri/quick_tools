@@ -27,14 +27,14 @@ workflow fastqc_workflow {
 
 task fastqc {
     input {
-        File fastq1                  # Required FASTQ file for single-end reads
-        File? fastq2                 # Optional second FASTQ file for paired-end reads
-        Int disk_space               # GB
-        Int memory                   # GB
+        File fastq1                  # Required FASTQ file
+        File? fastq2                 # Optional FASTQ file for paired-end reads
+        Int disk_space               # Disk space in GB
+        Int memory                   # Memory in GB
         Int num_threads              # Number of CPU threads
     }
 
-    command {
+    command <<<
         set -euo pipefail
 
         # Create output directory
@@ -47,13 +47,13 @@ task fastqc {
             ${fastq1}
 
         # Optionally run FastQC on the second FASTQ file
-        if [ -n "${fastq2}" ]; then
+        if [ -n "~{fastq2}" ]; then
             fastqc \
                 --outdir fastqc_output \
                 --threads ${num_threads} \
-                ${fastq2}
+                ~{fastq2}
         fi
-    }
+    >>>
 
     output {
         File fastq1_report = glob("fastqc_output/*${basename(fastq1)}*_fastqc.html")[0]
@@ -62,7 +62,7 @@ task fastqc {
     }
 
     runtime {
-        docker: "biocontainers/fastqc:v0.11.9_cv8"          
+        docker: "biocontainers/fastqc:v0.11.9_cv8"
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"
@@ -70,6 +70,6 @@ task fastqc {
 
     meta {
         author: "Shadi Zaheri"
-        description: "Run FastQC to perform quality control on FASTQ files, using default output file names."
+        description: "Run FastQC to perform quality control on FASTQ files, with optional paired-end processing."
     }
 }

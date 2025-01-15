@@ -1,4 +1,5 @@
 version 1.0
+
 workflow fastqc_workflow {
     input {
         File fastq1                     # First FASTQ file (required)
@@ -8,72 +9,60 @@ workflow fastqc_workflow {
         Int num_threads = 4             # Default number of CPU threads
     }
 
-    call fastqc {
+    # Run FastQC for fastq1
+    call run_fastqc {
         input:
-            fastq1 = fastq1,
-            fastq2 = fastq2,
+            fastq = fastq1,
             disk_space = disk_space,
             memory = memory,
             num_threads = num_threads
     }
 
+    # Run FastQC for fastq2
+    call run_fastqc as run_fastqc_2 {
+        input:
+            fastq = fastq2,
+            disk_space = disk_space,
+            memory = memory,
+            num_threads = num_threads
+    }
+
+    # Outputs
     output {
-        File report1 = fastqc.report1         # HTML report for fastq1
-        File report2 = fastqc.report2         # HTML report for fastq2
-        #File zip1 = fastqc.zip1               
-        #File zip2 = fastqc.zip2              
+        File fastqc1_html = run_fastqc.fastqc_html
+        File fastqc2_html = run_fastqc_2.fastqc_html
     }
 }
 
-task fastqc {
+task run_fastqc {
+    # Inputs
     input {
-        File fastq1                     # First FASTQ file
-        File fastq2                     # Second FASTQ file
-        Int disk_space                  # Disk space in GB
+        File fastq
         Int memory                      # Memory in GB
+        Int disk_space                  # Disk space in GB
         Int num_threads                 # Number of CPU threads
     }
 
-    command <<<
-        set -euo pipefail
-
-        # Create output directory
-        mkdir -p fastqc_output
-
-        echo "Running FastQC with the following inputs:"
-        echo "FASTQ1: ${fastq1}"
-        echo "FASTQ2: ${fastq2}"
-        echo "Threads: ${num_threads}"
-
-        # Run FastQC for each file
-        fastqc \
-            --outdir fastqc_output \
-            --threads ${num_threads} \
-            ${fastq1}
-
-        fastqc \
-            --outdir fastqc_output \
-            --threads ${num_threads} \
-            ${fastq2}
-    >>>
-
-    output {
-        # Match FastQC's default output naming
-        File report1 = glob("fastqc_output/*_fastqc.html")[0]  # First FASTQ HTML report
-        File report2 = glob("fastqc_output/*_fastqc.html")[1]  # Second FASTQ HTML report
-        #File zip1 = glob("fastqc_output/*_fastqc.zip")[0]      # First FASTQ ZIP file
-        #File zip2 = glob("fastqc_output/*_fastqc.zip")[1]      # Second FASTQ ZIP file
+    # Command to run FastQC
+    command {
+        fastqc ${fastq} --outdir=.
     }
 
+    # Runtime settings
     runtime {
-        docker: "biocontainers/fastqc:v0.11.9_cv8"
-        memory: "${memory}GB"
+        memory: "${memory} GB"
         disks: "local-disk ${disk_space} HDD"
-        cpu: "${num_threads}"
+        cpu: num_threads
+        docker: "biocontainers/fastqc:v0.11.9_cv8"  # Use FastQC Docker container
     }
 
+    # Outputs
+    output {
+        File fastqc_zip = "${basename(fastq)}_fastqc.zip"
+        File fastqc_html = "${basename(fastq)}_fastqc.html"
+    }
     meta {
-        author: "Shadi Zaheri"
-        description: "Run FastQC to perform quality control on FASTQ files"
+      author: "Shadi Zaheri"
+      description: "Run FastQC to perform quality control on FASTQ files"
     }
 }

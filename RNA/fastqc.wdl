@@ -2,9 +2,8 @@ version 1.0
 
 workflow fastqc_workflow {
     input {
-        File fastq1                     
-        File? fastq2                    
-        String output_prefix            
+        File fastq1                     # Required FASTQ file for single-end reads
+        File? fastq2                    # Optional second FASTQ file for paired-end reads
         Int disk_space = 10             # Default disk space in GB
         Int memory = 4                  # Default memory in GB
         Int num_threads = 2             # Default number of CPU threads
@@ -14,7 +13,6 @@ workflow fastqc_workflow {
         input:
             fastq1 = fastq1,
             fastq2 = fastq2,
-            output_prefix = output_prefix,
             disk_space = disk_space,
             memory = memory,
             num_threads = num_threads
@@ -23,14 +21,14 @@ workflow fastqc_workflow {
     output {
         File fastq1_report = fastqc.fastq1_report
         File? fastq2_report = fastqc.fastq2_report
+        Array[File] zips = fastqc.zips
     }
 }
 
 task fastqc {
     input {
-        File fastq1                  
-        File? fastq2                 # Optional: Second FASTQ file for paired-end reads
-        String output_prefix         
+        File fastq1                  # Required FASTQ file for single-end reads
+        File? fastq2                 # Optional second FASTQ file for paired-end reads
         Int disk_space               # GB
         Int memory                   # GB
         Int num_threads              # Number of CPU threads
@@ -42,28 +40,25 @@ task fastqc {
         # Create output directory
         mkdir -p fastqc_output
 
-        # Run FastQC on fastq1
+        # Run FastQC on the first FASTQ file
         fastqc \
             --outdir fastqc_output \
             --threads ${num_threads} \
             ${fastq1}
-        mv fastqc_output/*.html fastqc_output/${output_prefix}_fastq1.html
-        mv fastqc_output/*.zip fastqc_output/${output_prefix}_fastq1.zip
 
-        # Optionally run FastQC on fastq2 if provided
+        # Optionally run FastQC on the second FASTQ file
         if [ -n "${fastq2}" ]; then
             fastqc \
                 --outdir fastqc_output \
                 --threads ${num_threads} \
                 ${fastq2}
-            mv fastqc_output/*.html fastqc_output/${output_prefix}_fastq2.html
-            mv fastqc_output/*.zip fastqc_output/${output_prefix}_fastq2.zip
         fi
     }
 
     output {
-        File fastq1_report = glob("fastqc_output/*_fastq1.html")[0]
-        File? fastq2_report = select_first([glob("fastqc_output/*_fastq2.html")[0], ""])
+        File fastq1_report = glob("fastqc_output/*${basename(fastq1)}*_fastqc.html")[0]
+        File? fastq2_report = select_first([glob("fastqc_output/*${basename(fastq2)}*_fastqc.html")[0], ""])
+        Array[File] zips = glob("fastqc_output/*.zip")
     }
 
     runtime {
@@ -75,6 +70,6 @@ task fastqc {
 
     meta {
         author: "Shadi Zaheri"
-        description: "Run FastQC to perform quality control on FASTQ files, with separate outputs for fastq1 and fastq2."
+        description: "Run FastQC to perform quality control on FASTQ files, using default output file names."
     }
 }

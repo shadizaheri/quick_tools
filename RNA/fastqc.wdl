@@ -2,66 +2,79 @@ version 1.0
 
 workflow fastqc_workflow {
     input {
-        File fastq1                     # First FASTQ file (required)
-        File fastq2                     # Second FASTQ file (required for paired-end reads)
-        Int disk_space = 50             # Default disk space in GB
-        Int memory = 8                  # Default memory in GB
-        Int num_threads = 4             # Default number of CPU threads
+        File fastq1                     
+        File? fastq2                    
+        String output_prefix            
+        Int disk_space = 10             # Default disk space in GB
+        Int memory = 4                  # Default memory in GB
+        Int num_threads = 2             # Default number of CPU threads
     }
 
-    # Run FastQC for fastq1
-    call run_fastqc {
+    call fastqc {
         input:
-            fastq = fastq1,
+            fastq1 = fastq1,
+            fastq2 = fastq2,
+            output_prefix = output_prefix,
             disk_space = disk_space,
             memory = memory,
             num_threads = num_threads
     }
 
-    # Run FastQC for fastq2
-    call run_fastqc as run_fastqc_2 {
-        input:
-            fastq = fastq2,
-            disk_space = disk_space,
-            memory = memory,
-            num_threads = num_threads
-    }
-
-    # Outputs
     output {
-        File fastqc1_html = run_fastqc.fastqc_html
-        File fastqc2_html = run_fastqc_2.fastqc_html
+        File fastq1_report = fastqc.fastq1_report
+        File? fastq2_report = fastqc.fastq2_report
     }
 }
 
-task run_fastqc {
-    # Inputs
+task fastqc {
     input {
-        File fastq
-        Int memory                      # Memory in GB
-        Int disk_space                  # Disk space in GB
-        Int num_threads                 # Number of CPU threads
+        File fastq1                  
+        File? fastq2                 # Optional: Second FASTQ file for paired-end reads
+        String output_prefix         
+        Int disk_space               # GB
+        Int memory                   # GB
+        Int num_threads              # Number of CPU threads
     }
 
-    # Command to run FastQC
     command {
-        fastqc ${fastq} --threads ${num_threads}
+        set -euo pipefail
+
+        # Create output directory
+        mkdir -p fastqc_output
+
+        # Run FastQC on fastq1
+        fastqc \
+            --outdir fastqc_output \
+            --threads ${num_threads} \
+            ${fastq1}
+        mv fastqc_output/*.html fastqc_output/${output_prefix}_fastq1.html
+        mv fastqc_output/*.zip fastqc_output/${output_prefix}_fastq1.zip
+
+        # Optionally run FastQC on fastq2 if provided
+        if [ -n "${fastq2}" ]; then
+            fastqc \
+                --outdir fastqc_output \
+                --threads ${num_threads} \
+                ${fastq2}
+            mv fastqc_output/*.html fastqc_output/${output_prefix}_fastq2.html
+            mv fastqc_output/*.zip fastqc_output/${output_prefix}_fastq2.zip
+        fi
     }
 
-    # Runtime settings
-    runtime {
-        memory: "${memory} GB"
-        disks: "local-disk ${disk_space} HDD"
-        cpu: num_threads
-        docker: "biocontainers/fastqc:v0.11.9_cv8"  # Use FastQC Docker container
-    }
-
-    # Outputs
     output {
-        File fastqc_html = "${basename(fastq)}_fastqc.html"  # HTML report only
+        File fastq1_report = glob("fastqc_output/*_fastq1.html")[0]
+        File? fastq2_report = select_first([glob("fastqc_output/*_fastq2.html")[0], ""])
     }
+
+    runtime {
+        docker: "biocontainers/fastqc:v0.11.9_cv8"          
+        memory: "${memory}GB"
+        disks: "local-disk ${disk_space} HDD"
+        cpu: "${num_threads}"
+    }
+
     meta {
         author: "Shadi Zaheri"
-        description: "Run FastQC to perform quality control on FASTQ files"
+        description: "Run FastQC to perform quality control on FASTQ files, with separate outputs for fastq1 and fastq2."
     }
 }

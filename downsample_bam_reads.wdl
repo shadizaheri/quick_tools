@@ -3,26 +3,28 @@ version 1.0
 workflow DownsampleAndIndexBam {
     input {
         File input_bam
-        String fraction
-        Int downsample_memory = 2  # Default memory in GB for the Downsample task
-        Int downsample_cpu = 1     # Default number of CPUs for the Downsample task
-        Int index_memory = 2       # Default memory in GB for the Index task
-        Int index_cpu = 1          # Default number of CPUs for the Index task
-        String disk_size = "50G"   # Default disk size for both tasks
-        String disk_type = "pd-ssd" # Default disk type for both tasks
+        Float fraction
+        String sample_name
+        Int downsample_memory = 2  # Default memory in GB
+        Int downsample_cpu = 1      # Default number of CPUs
+        Int index_memory = 2        # Default memory for indexing
+        Int index_cpu = 1           # Default CPUs for indexing
+        String disk_size = "50G"    # Default disk size
+        String disk_type = "pd-ssd" # Default disk type
     }
 
     meta {
         author: "Shadi Zaheri"
         email: "szaheri@broadinstitute.org"
-        version: "1.0"
-        description: "Workflow to downsample a BAM file based on reads and index the resulting BAM file."
+        version: "1.1"
+        description: "Workflow to downsample a BAM file and index the resulting BAM file."
     }
 
     call Downsample {
         input:
             input_bam = input_bam,
             fraction = fraction,
+            sample_name = sample_name,
             memory = downsample_memory,
             cpu = downsample_cpu,
             disk_size = disk_size,
@@ -47,7 +49,8 @@ workflow DownsampleAndIndexBam {
 task Downsample {
     input {
         File input_bam
-        String fraction
+        Float fraction
+        String sample_name
         Int memory
         Int cpu
         String disk_size
@@ -55,16 +58,15 @@ task Downsample {
     }
 
     command {
-        # Downsample the BAM file based on the specified fraction of reads
-        samtools view -s ${fraction} -b ${input_bam} > downsampled.bam
+        samtools view -@ ${cpu} -s ${fraction} -b ${input_bam} > ${sample_name}_downsampled.bam
     }
 
     output {
-        File downsampled_bam = "downsampled.bam"
+        File downsampled_bam = "${sample_name}_downsampled.bam"
     }
 
     runtime {
-        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
+        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
         memory: "${memory}G"
         cpu: "${cpu}"
         disks: "local-disk ${disk_size} ${disk_type}"
@@ -81,8 +83,7 @@ task IndexBam {
     }
 
     command {
-        # Index the downsampled BAM file
-        samtools index ${bam}
+        samtools index -@ ${cpu} ${bam} ${bam}.bai
     }
 
     output {
@@ -90,7 +91,7 @@ task IndexBam {
     }
 
     runtime {
-        docker: "biocontainers/samtools:v1.9-4-deb_cv1"
+        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
         memory: "${memory}G"
         cpu: "${cpu}"
         disks: "local-disk ${disk_size} ${disk_type}"

@@ -3,27 +3,35 @@ version 1.0
 workflow DownsampleAndIndexBam {
     input {
         File input_bam
-        Float fraction
+        Int target_reads
         String sample_name
-        Int downsample_memory = 2  
-        Int downsample_cpu = 1     
-        Int index_memory = 2       
-        Int index_cpu = 1          
-        String disk_size = "50G"   
-        String disk_type = "pd-ssd"
+        Int downsample_memory = 2  # Default memory in GB
+        Int downsample_cpu = 1      # Default number of CPUs
+        Int index_memory = 2        # Default memory for indexing
+        Int index_cpu = 1           # Default CPUs for indexing
+        String disk_size = "50G"    # Default disk size
+        String disk_type = "pd-ssd" # Default disk type
     }
 
     meta {
         author: "Shadi Zaheri"
         email: "szaheri@broadinstitute.org"
-        version: "1.1"
-        description: "Workflow to downsample a BAM file and index the resulting BAM file."
+        version: "1.2"
+        description: "Workflow to downsample a BAM file to an exact number of reads and index the resulting BAM file."
+    }
+
+    call CountReads { input: bam = input_bam }
+
+    call CalculateFraction {
+        input:
+            total_reads = CountReads.total_reads,
+            target_reads = target_reads
     }
 
     call Downsample {
         input:
             input_bam = input_bam,
-            fraction = fraction,
+            fraction = CalculateFraction.fraction,
             sample_name = sample_name,
             memory = downsample_memory,
             cpu = downsample_cpu,
@@ -43,6 +51,37 @@ workflow DownsampleAndIndexBam {
     output {
         File downsampled_bam = Downsample.downsampled_bam
         File downsampled_bam_index = IndexBam.bam_index
+    }
+}
+
+task CountReads {
+    input {
+        File bam
+    }
+    command {
+        samtools view -c ${bam} > total_reads.txt
+    }
+    output {
+        Int total_reads = read_int("total_reads.txt")
+    }
+    runtime {
+        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
+    }
+}
+
+task CalculateFraction {
+    input {
+        Int total_reads
+        Int target_reads
+    }
+    command {
+        echo "scale=6; ${target_reads} / ${total_reads}" | bc > fraction.txt
+    }
+    output {
+        Float fraction = read_float("fraction.txt")
+    }
+    runtime {
+        docker: "ubuntu:latest"
     }
 }
 

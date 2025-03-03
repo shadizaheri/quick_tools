@@ -5,12 +5,11 @@ workflow DownsampleAndIndexBam {
         File input_bam
         Int target_reads
         String sample_name
-        Int downsample_memory = 2  # GB
-        Int downsample_cpu = 1      
-        Int index_memory = 2        
-        Int index_cpu = 1           
-        String disk_size = "50G"    
-        String disk_type = "pd-ssd" 
+        Int? downsample_memory = 2  # GB
+        Int? downsample_cpu = 1      
+        Int? index_memory = 2        
+        Int? index_cpu = 1           
+        String? disk_space = "local-disk 50G"  # Unified disk setting
     }
 
     meta {
@@ -35,8 +34,7 @@ workflow DownsampleAndIndexBam {
             sample_name = sample_name,
             memory = downsample_memory,
             cpu = downsample_cpu,
-            disk_size = disk_size,
-            disk_type = disk_type
+            disk_space = disk_space
     }
 
     call IndexBam {
@@ -44,8 +42,7 @@ workflow DownsampleAndIndexBam {
             bam = Downsample.downsampled_bam,
             memory = index_memory,
             cpu = index_cpu,
-            disk_size = disk_size,
-            disk_type = disk_type
+            disk_space = disk_space
     }
 
     output {
@@ -90,10 +87,9 @@ task Downsample {
         File input_bam
         Float fraction
         String sample_name
-        Int memory
-        Int cpu
-        String disk_size
-        String disk_type
+        Int? memory
+        Int? cpu
+        String? disk_space
     }
 
     command {
@@ -106,19 +102,18 @@ task Downsample {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
-        memory: "${memory}G"
-        cpu: "${cpu}"
-        disks: "local-disk ${disk_size} ${disk_type}"
+        memory: select_first([memory, "8G"])
+        cpu: select_first([cpu, 4])
+        disks: select_first([disk_space, "local-disk 50G"])
     }
 }
 
 task IndexBam {
     input {
         File bam
-        Int memory
-        Int cpu
-        String disk_size
-        String disk_type
+        Int? memory
+        Int? cpu
+        String? disk_space
     }
 
     command {
@@ -131,8 +126,8 @@ task IndexBam {
 
     runtime {
         docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
-        memory: "${memory}G"
-        cpu: "${cpu}"
-        disks: "local-disk ${disk_size} ${disk_type}"
+        memory: select_first([memory, "8G"])
+        cpu: select_first([cpu, 4])
+        disks: select_first([disk_space, "local-disk 50G"])
     }
 }

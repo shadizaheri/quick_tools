@@ -5,12 +5,12 @@ workflow DownsampleAndIndexBam {
         File input_bam
         Int target_reads
         String sample_name
-        Int downsample_memory = 2  # Default memory in GB
-        Int downsample_cpu = 1      # Default number of CPUs
-        Int index_memory = 2        # Default memory for indexing
-        Int index_cpu = 1           # Default CPUs for indexing
-        String disk_size = "50G"    # Default disk size
-        String disk_type = "pd-ssd" # Default disk type
+        Int downsample_memory = 2  # GB
+        Int downsample_cpu = 1      
+        Int index_memory = 2        
+        Int index_cpu = 1           
+        String disk_size = "50G"    
+        String disk_type = "pd-ssd" 
     }
 
     meta {
@@ -65,7 +65,7 @@ task CountReads {
         Int total_reads = read_int("total_reads.txt")
     }
     runtime {
-        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
+        docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
     }
 }
 
@@ -105,7 +105,7 @@ task Downsample {
     }
 
     runtime {
-        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
+        docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
         memory: "${memory}G"
         cpu: "${cpu}"
         disks: "local-disk ${disk_size} ${disk_type}"
@@ -130,7 +130,7 @@ task IndexBam {
     }
 
     runtime {
-        docker: "quay.io/biocontainers/samtools:1.16--h9aed4be_0"
+        docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
         memory: "${memory}G"
         cpu: "${cpu}"
         disks: "local-disk ${disk_size} ${disk_type}"

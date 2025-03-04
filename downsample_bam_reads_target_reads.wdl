@@ -75,7 +75,7 @@ task CountReads {
   runtime {
     docker: docker
     memory: "~{memory_gb} GiB"
-    disks: "~{disk_gb} GiB"
+    disks: "local-disk ~{disk_gb} HDD"
     cpu: cpu
   }
 }
@@ -105,7 +105,7 @@ task Downsample {
   runtime {
     docker: docker
     memory: "~{memory_gb} GiB"
-    disks: "~{disk_gb} GiB"
+    disks: "local-disk ~{disk_gb} HDD"
     cpu: cpu
   }
 }

@@ -50,7 +50,7 @@ task CountReads {
     Int total_reads = read_int("total_reads.txt")
   }
   runtime {
-    docker: "biocontainers/samtools:v1.10.0_cv1"
+    docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
     memory: memory
     cpu: 1
     disk: disk
@@ -78,7 +78,7 @@ task Downsample {
     File downsampled_bai = "${sample_id}_downsampled.bam.bai"
   }
   runtime {
-    docker: "biocontainers/samtools:v1.10.0_cv1"
+    docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
     memory: memory
     cpu: 2
     disk: disk

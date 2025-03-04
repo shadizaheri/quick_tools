@@ -1,22 +1,41 @@
 version 1.0
 
 workflow DownsampleBam {
+  parameter_meta {
+    bam: "Path to the input BAM file."
+    bai: "Path to the input BAI index file."
+    target_reads: "Target number of reads after downsampling."
+    sample_id: "Sample name used for output file naming."
+    memory_gb_count_reads: "Memory allocated for the CountReads task in gigabytes."
+    disk_gb_count_reads: "Disk space allocated for the CountReads task in gigabytes."
+    memory_gb_downsample: "Memory allocated for the Downsample task in gigabytes."
+    disk_gb_downsample: "Disk space allocated for the Downsample task in gigabytes."
+    cpu_count_reads: "Number of CPU cores allocated for CountReads."
+    cpu_downsample: "Number of CPU cores allocated for Downsample."
+    docker: "Docker image used to run the tasks."
+  }
+
   input {
     File bam
     File bai
     Int target_reads = 75000000
     String sample_id
-    String count_reads_memory = "4G"
-    String count_reads_disk = "10G"
-    String downsample_memory = "8G"
-    String downsample_disk = "50G"
+    Int memory_gb_count_reads = 4
+    Int disk_gb_count_reads = 10
+    Int memory_gb_downsample = 8
+    Int disk_gb_downsample = 50
+    Int cpu_count_reads = 1
+    Int cpu_downsample = 2
+    String docker = "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
   }
   
   call CountReads { 
     input: 
       bam = bam,
-      memory = count_reads_memory,
-      disk = count_reads_disk
+      memory_gb = memory_gb_count_reads,
+      disk_gb = disk_gb_count_reads,
+      cpu = cpu_count_reads,
+      docker = docker
   }
   
   call Downsample {
@@ -26,8 +45,10 @@ workflow DownsampleBam {
       total_reads = CountReads.total_reads,
       target_reads = target_reads,
       sample_id = sample_id,
-      memory = downsample_memory,
-      disk = downsample_disk
+      memory_gb = memory_gb_downsample,
+      disk_gb = disk_gb_downsample,
+      cpu = cpu_downsample,
+      docker = docker
   }
   
   output {
@@ -40,8 +61,10 @@ workflow DownsampleBam {
 task CountReads {
   input {
     File bam
-    String memory
-    String disk
+    Int memory_gb
+    Int disk_gb
+    Int cpu
+    String docker
   }
   command {
     samtools view -c ${bam} > total_reads.txt
@@ -50,10 +73,10 @@ task CountReads {
     Int total_reads = read_int("total_reads.txt")
   }
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
-    memory: memory
-    cpu: 1
-    disk: disk
+    docker: docker
+    memory: "~{memory_gb} GiB"
+    disks: "local-disk ~{disk_gb} HDD"
+    cpu: cpu
   }
 }
 
@@ -65,8 +88,10 @@ task Downsample {
     Int total_reads
     Int target_reads
     String sample_id
-    String memory
-    String disk
+    Int memory_gb
+    Int disk_gb
+    Int cpu
+    String docker
   }
   command {
     fraction=$(echo "scale=6; ${target_reads}/${total_reads}" | bc)
@@ -78,9 +103,9 @@ task Downsample {
     File downsampled_bai = "${sample_id}_downsampled.bam.bai"
   }
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
-    memory: memory
-    cpu: 2
-    disk: disk
+    docker: docker
+    memory: "~{memory_gb} GiB"
+    disks: "local-disk ~{disk_gb} HDD"
+    cpu: cpu
   }
 }

@@ -18,7 +18,7 @@ workflow DownsampleTranscriptomeBam {
     Int memory_gb = 4
     Int disk_gb = 50
     Int cpu = 2
-    String docker = "biocontainers/samtools:v1.10.0_cv1"
+    String docker = "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
   }
   
   call ExtractReadNames {

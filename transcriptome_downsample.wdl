@@ -18,7 +18,7 @@ workflow DownsampleTranscriptomeBam {
     Int memory_gb = 4
     Int disk_gb = 50
     Int cpu = 2
-    String docker = "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
+    String docker = "biocontainers/samtools:v1.10.0_cv1"
   }
   
   call ExtractReadNames {
@@ -82,7 +82,16 @@ task DownsampleTranscriptome {
     String docker
   }
   command {
-    samtools view -b -N ~{read_names_file} ~{transcriptome_bam} -o ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam
+    samtools view -b -N ~{read_names_file} ~{transcriptome_bam} -o tmp.bam
+    
+    # Ensure BAM is not empty
+    if [ ! -s tmp.bam ]; then
+        echo "Error: The downsampled transcriptome BAM is empty." >&2
+        exit 1
+    fi
+    
+    # Sort the BAM before indexing
+    samtools sort -o ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam tmp.bam
     samtools index ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam
   }
   output {
@@ -96,4 +105,3 @@ task DownsampleTranscriptome {
     cpu: cpu
   }
 }
-

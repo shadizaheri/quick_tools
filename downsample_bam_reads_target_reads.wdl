@@ -74,7 +74,6 @@ workflow DownsampleBam {
     File downsampled_bam = Downsample.downsampled_bam
     File downsampled_bai = Downsample.downsampled_bai
     File downsampled_transcriptome_bam = Downsample.downsampled_transcriptome_bam
-    File downsampled_transcriptome_bai = Downsample.downsampled_transcriptome_bai
     Int downsampled_total_reads = CountDownsampledReads.downsampled_total_reads
     Int downsampled_transcriptome_total_reads = CountDownsampledReads.downsampled_transcriptome_total_reads
   }
@@ -145,13 +144,11 @@ task Downsample {
 
     # Sort transcriptome BAM by name (important for RSEM compatibility)
     samtools sort -n -o ${sample_id}_downsampled_Aligned.toTranscriptome.out.bam tmp_transcriptome.bam
-    samtools index ${sample_id}_downsampled_Aligned.toTranscriptome.out.bam
   }
   output {
     File downsampled_bam = "~{sample_id}_downsampled.bam"
     File downsampled_bai = "~{sample_id}_downsampled.bam.bai"
     File downsampled_transcriptome_bam = "~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam"
-    File downsampled_transcriptome_bai = "~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam.bai"
   }
   runtime {
     docker: docker

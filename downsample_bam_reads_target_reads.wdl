@@ -80,7 +80,7 @@ workflow DownsampleBam {
   }
 }
 
-# Step 1: Count total reads
+# Count total reads
 task CountReads {
   input {
     File bam
@@ -103,7 +103,7 @@ task CountReads {
   }
 }
 
-# Step 2: Downsample Both Genomic and Transcriptome BAMs with Paired-End Read Retention
+# Downsample Both Genomic and Transcriptome BAMs with Paired-End Read Retention
 task Downsample {
   input {
     File bam
@@ -161,8 +161,7 @@ task Downsample {
   }
 }
 
-
-# Step 3: Count reads after downsampling
+# Count reads after downsampling
 task CountDownsampledReads {
   input {
     File bam

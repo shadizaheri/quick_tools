@@ -82,7 +82,7 @@ task DownsampleTranscriptome {
     String docker
   }
   command {
-    samtools view -b -N ~{read_names_file} ~{transcriptome_bam} -o tmp.bam
+    samtools view -b -N ~{read_names_file} -f 1 ~{transcriptome_bam} -o tmp.bam
     
     # Ensure BAM is not empty
     if [ ! -s tmp.bam ]; then
@@ -90,7 +90,7 @@ task DownsampleTranscriptome {
         exit 1
     fi
     
-    # Sort the BAM by read name before indexing (for RSEM compatibility)
+    # Sort by read name before indexing (for RSEM compatibility)
     samtools sort -n -o sorted_tmp.bam tmp.bam
     mv sorted_tmp.bam ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam
     

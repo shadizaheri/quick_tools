@@ -90,8 +90,11 @@ task DownsampleTranscriptome {
         exit 1
     fi
     
-    # Sort the BAM before indexing
-    samtools sort -o ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam tmp.bam
+    # Sort the BAM by read name before indexing (for RSEM compatibility)
+    samtools sort -n -o sorted_tmp.bam tmp.bam
+    mv sorted_tmp.bam ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam
+    
+    # Index the sorted BAM
     samtools index ~{sample_id}_downsampled_Aligned.toTranscriptome.out.bam
   }
   output {

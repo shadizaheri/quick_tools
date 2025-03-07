@@ -120,18 +120,31 @@ task Downsample {
   command {
     fraction=$(echo "scale=6; ${target_reads}/${total_reads}" | bc)
     
-    # Ensure paired-end reads are retained and apply the same fraction to both BAMs
-    samtools view -b -s $fraction -f 1 ${bam} -o tmp_genomic.bam  # Keep only paired reads
-    samtools view -b -s $fraction -f 1 ${transcriptome_bam} -o tmp_transcriptome.bam  # Keep only paired reads
-    
-    # Sort genomic BAM by name to maintain pairing
-    samtools sort -n -o ${sample_id}_downsampled.bam tmp_genomic.bam
-    
-    # Sort transcriptome BAM by name for RSEM compatibility
-    samtools sort -n -o ${sample_id}_downsampled_Aligned.toTranscriptome.out.bam tmp_transcriptome.bam
-    
-    # Index both BAMs
+    # Downsample genomic BAM while retaining paired-end reads
+    samtools view -b -s $fraction -f 1 -F 12 ${bam} -o tmp_genomic.bam  # Retain properly paired reads
+
+    # Extract retained read names
+    samtools view tmp_genomic.bam | cut -f1 | sort | uniq > retained_reads.txt
+
+    # Downsample transcriptome BAM based on retained reads
+    samtools view -b -N retained_reads.txt ${transcriptome_bam} -o tmp_transcriptome.bam
+
+    # Ensure BAMs are not empty
+    if [ ! -s tmp_genomic.bam ]; then
+        echo "Error: The downsampled genomic BAM is empty." >&2
+        exit 1
+    fi
+    if [ ! -s tmp_transcriptome.bam ]; then
+        echo "Error: The downsampled transcriptome BAM is empty." >&2
+        exit 1
+    fi
+
+    # Sort genomic BAM by coordinate before indexing
+    samtools sort -o ${sample_id}_downsampled.bam tmp_genomic.bam
     samtools index ${sample_id}_downsampled.bam
+
+    # Sort transcriptome BAM by name (important for RSEM compatibility)
+    samtools sort -n -o ${sample_id}_downsampled_Aligned.toTranscriptome.out.bam tmp_transcriptome.bam
     samtools index ${sample_id}_downsampled_Aligned.toTranscriptome.out.bam
   }
   output {

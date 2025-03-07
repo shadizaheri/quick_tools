@@ -3,9 +3,8 @@ version 1.0
 workflow DownsampleSTARBAMs {
   parameter_meta {
     genome_bam: "Path to the input STAR genome-aligned BAM file."
-    transcriptome_bam: "Path to the input STAR transcriptome BAM file."
+    transcriptome_bam: "Path to the input STAR transcriptome BAM file (no index needed)."
     genome_bai: "Path to the input genome BAM index file."
-    transcriptome_bai: "Path to the input transcriptome BAM index file."
     target_reads: "Target number of reads after downsampling. Default: 75,000,000."
     sample_id: "Sample name used for output file naming."
     memory_gb_count_reads: "Memory allocated for the CountReads task in gigabytes."
@@ -27,7 +26,6 @@ workflow DownsampleSTARBAMs {
     File genome_bam
     File transcriptome_bam
     File genome_bai
-    File transcriptome_bai
     Int target_reads = 75000000
     String sample_id
     Int memory_gb_count_reads = 4
@@ -70,7 +68,6 @@ workflow DownsampleSTARBAMs {
   call DownsampleTranscriptomeBAM {
     input:
       transcriptome_bam = transcriptome_bam,
-      transcriptome_bai = transcriptome_bai,
       read_ids = DownsampleGenomeBAM.read_ids,
       sample_id = sample_id,
       memory_gb = memory_gb_downsample_transcriptome,
@@ -152,7 +149,6 @@ task DownsampleGenomeBAM {
 task DownsampleTranscriptomeBAM {
   input {
     File transcriptome_bam
-    File transcriptome_bai
     File read_ids
     String sample_id
     Int memory_gb

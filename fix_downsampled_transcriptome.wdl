@@ -11,10 +11,27 @@ workflow FixTranscriptomeBAM {
     String docker = "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
   }
 
+  call RemoveSecondaryAlignments {
+    input:
+      transcriptome_bam = transcriptome_bam,
+      sample_id = sample_id,
+      memory_gb = memory_gb,
+      disk_gb = disk_gb,
+      cpu = cpu,
+      docker = docker
+  }
+
+  call CountReads {
+    input:
+      bam = RemoveSecondaryAlignments.filtered_transcriptome_bam,
+      sample_id = sample_id,
+      docker = docker
+  }
+
   call ExtractReadNames {
     input:
       genomic_bam = genomic_bam,
-      transcriptome_bam = transcriptome_bam,
+      transcriptome_bam = RemoveSecondaryAlignments.filtered_transcriptome_bam,
       sample_id = sample_id,
       memory_gb = memory_gb,
       disk_gb = disk_gb,
@@ -24,12 +41,19 @@ workflow FixTranscriptomeBAM {
 
   call FilterTranscriptomeBAM {
     input:
-      transcriptome_bam = transcriptome_bam,
+      transcriptome_bam = RemoveSecondaryAlignments.filtered_transcriptome_bam,
       retained_reads = ExtractReadNames.retained_reads,
       sample_id = sample_id,
       memory_gb = memory_gb,
       disk_gb = disk_gb,
       cpu = cpu,
+      docker = docker
+  }
+
+  call CountReads as CountFilteredReads {
+    input:
+      bam = FilterTranscriptomeBAM.filtered_transcriptome_bam,
+      sample_id = sample_id,
       docker = docker
   }
 
@@ -43,12 +67,67 @@ workflow FixTranscriptomeBAM {
       docker = docker
   }
 
+  call CountReads as CountFinalReads {
+    input:
+      bam = ValidateAndSortBAM.sorted_filtered_transcriptome_bam,
+      sample_id = sample_id,
+      docker = docker
+  }
+
   output {
     File fixed_transcriptome_bam = ValidateAndSortBAM.sorted_filtered_transcriptome_bam
+    Int initial_transcriptome_reads = CountReads.total_reads
+    Int filtered_transcriptome_reads = CountFilteredReads.total_reads
+    Int final_transcriptome_reads = CountFinalReads.total_reads
   }
 }
 
-### Task 1: Extract Read Names from Both BAMs
+### Task 1: Remove Secondary Alignments from Transcriptome BAM
+task RemoveSecondaryAlignments {
+  input {
+    File transcriptome_bam
+    String sample_id
+    Int memory_gb
+    Int disk_gb
+    Int cpu
+    String docker
+  }
+  command {
+    samtools view -b -F 256 ${transcriptome_bam} -o filtered_transcriptome.bam
+  }
+  output {
+    File filtered_transcriptome_bam = "filtered_transcriptome.bam"
+  }
+  runtime {
+    docker: docker
+    memory: "~{memory_gb} GiB"
+    disks: "local-disk ~{disk_gb} HDD"
+    cpu: cpu
+  }
+}
+
+### Task 2: Count Reads in BAM File
+task CountReads {
+  input {
+    File bam
+    String sample_id
+    String docker
+  }
+  command {
+    samtools view -c ${bam} > read_count.txt
+  }
+  output {
+    Int total_reads = read_int("read_count.txt")
+  }
+  runtime {
+    docker: docker
+    memory: "2 GiB"
+    disks: "local-disk 10 HDD"
+    cpu: 1
+  }
+}
+
+### Task 3: Extract Read Names from Both BAMs
 task ExtractReadNames {
   input {
     File genomic_bam
@@ -78,7 +157,7 @@ task ExtractReadNames {
   }
 }
 
-### Task 2: Filter Transcriptome BAM Based on Retained Reads
+### Task 4: Filter Transcriptome BAM Based on Retained Reads
 task FilterTranscriptomeBAM {
   input {
     File transcriptome_bam
@@ -91,10 +170,10 @@ task FilterTranscriptomeBAM {
   }
   command {
     # Keep only reads present in retained_reads.txt
-    samtools view -b -N retained_reads ${transcriptome_bam} -o filtered_transcriptome.bam
+    samtools view -b -N retained_reads ${transcriptome_bam} -o filtered_transcriptome_final.bam
   }
   output {
-    File filtered_transcriptome_bam = "filtered_transcriptome.bam"
+    File filtered_transcriptome_bam = "filtered_transcriptome_final.bam"
   }
   runtime {
     docker: docker
@@ -104,7 +183,7 @@ task FilterTranscriptomeBAM {
   }
 }
 
-### Task 3: Validate BAM Order and Sort if Needed
+### Task 5: Validate BAM Order and Sort if Needed
 task ValidateAndSortBAM {
   input {
     File filtered_transcriptome_bam
@@ -129,4 +208,3 @@ task ValidateAndSortBAM {
     cpu: cpu
   }
 }
-

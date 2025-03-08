@@ -40,7 +40,7 @@ workflow DownsampleSTARBAMs {
     Int cpu_downsample_genome = 4
     Int cpu_downsample_transcriptome = 4
     Int cpu_count_downsampled = 1
-    String docker = "us.gcr.io/broad-dsp-lrma/mosdepth:sz_v3272024"
+    String docker = "quay.io/biocontainers/samtools:1.15--h1170115_0"
   }
   
   call CountReads { 

@@ -20,6 +20,8 @@ workflow cram_to_fastq_workflow {
     Int? ubam_to_fastq_cpu = 2
     String? ubam_to_fastq_disk = "local-disk 20 HDD"
     Int? ubam_to_fastq_preemptible = 1
+
+    String prefix
   }
 
   call CramToBam {
@@ -45,6 +47,7 @@ workflow cram_to_fastq_workflow {
   call UbamToFastq {
     input:
       ubam = BamToUbam.ubam,
+      prefix = prefix,
       memory = select_first([ubam_to_fastq_memory, "4G"]),
       cpu = select_first([ubam_to_fastq_cpu, 2]),
       disk = select_first([ubam_to_fastq_disk, "local-disk 20 HDD"]),
@@ -117,16 +120,18 @@ task UbamToFastq {
     Int cpu
     String disk
     Int preemptible
+    String prefix
   }
   command {
     gatk SamToFastq \
       -I ~{ubam} \
-      -F read1.fastq \
-      -F2 read2.fastq
+      -F ~{prefix}_read1.fastq \
+      -F2 ~{prefix}_read2.fastq
   }
+
   output {
-    File read1_fastq = "read1.fastq"
-    File read2_fastq = "read2.fastq"
+    File read1_fastq = "~{prefix}_read1.fastq"
+    File read2_fastq = "~{prefix}_read2.fastq"
   }
   runtime {
     docker: "us.gcr.io/broad-gatk/gatk:latest"

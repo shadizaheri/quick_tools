@@ -1,13 +1,35 @@
-version 1.0 
+version 1.0
+
+workflow BamMd5Workflow {
+  input {
+    File input_bam
+    String md5_memory = "2G"
+    Int md5_cpu = 1
+    String md5_disk = "local-disk 20 HDD"
+    Int md5_preemptible = 1
+  }
+
+  call ComputeMd5 {
+    input:
+      bam_file = input_bam,
+      memory = md5_memory,
+      cpu = md5_cpu,
+      disk = md5_disk,
+      preemptible = md5_preemptible
+  }
+
+  output {
+    File md5_output = ComputeMd5.md5_file
+  }
+}
+
 task ComputeMd5 {
   input {
     File bam_file
-    Int cpu_cores = 1
-    String memory_gb = "2 GB"
-    # Disk size in GB
-    Int disk_space_gb = 10
-    # Disk type should be one of LOCAL, SSD, HDD
-    String disk_type = "SSD"
+    String memory
+    Int cpu
+    String disk
+    Int preemptible
   }
 
   command {
@@ -19,33 +41,11 @@ task ComputeMd5 {
   }
 
   runtime {
-    cpu: cpu_cores
-    memory: memory_gb
-    disks: "local-disk " + disk_type + " " + disk_space_gb
     docker: "ubuntu:20.04"
-  }
-}
-
-workflow BamMd5Workflow {
-  input {
-    File input_bam
-    Int cpu_cores = 1
-    String memory_gb = "2 GB"
-    Int disk_space_gb = 10
-    String disk_type = "SSD"
-  }
-
-  call ComputeMd5 {
-    input:
-      bam_file = input_bam,
-      cpu_cores = cpu_cores,
-      memory_gb = memory_gb,
-      disk_space_gb = disk_space_gb,
-      disk_type = disk_type
-  }
-
-  output {
-    File md5_output = ComputeMd5.md5_file
+    memory: memory
+    cpu: cpu
+    disks: disk
+    preemptible: preemptible
   }
 
   meta {

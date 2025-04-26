@@ -78,6 +78,14 @@ task RunDESeq2 {
 
     # Load metadata
     meta <- read.table(meta_file, header = TRUE, row.names = 1, sep = "\t")
+
+    # Check sample consistency BEFORE subsetting
+    missing_samples <- setdiff(rownames(meta), colnames(counts))
+    if (length(missing_samples) > 0) {
+      stop(paste("Samples in metadata but not in counts:", paste(missing_samples, collapse=", ")))
+    }
+
+    # Safe subsetting
     counts <- counts[, rownames(meta)]
 
     # Create DESeq2 dataset
@@ -92,10 +100,6 @@ task RunDESeq2 {
     # Normalized Counts
     norm_counts <- counts(dds, normalized=TRUE)
     write.table(as.data.frame(norm_counts), file = paste0(prefix, "_normalized_counts.tsv"), sep = "\t", quote = FALSE)
-    missing_samples <- setdiff(rownames(meta), colnames(counts))
-    if (length(missing_samples) > 0) {
-      stop(paste("Samples in metadata but not in counts:", paste(missing_samples, collapse=", ")))
-    }
 
     # PCA Plot
     vsd <- vst(dds)

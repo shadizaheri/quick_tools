@@ -118,7 +118,7 @@ task RunDESeq2 {
   }
 
   runtime {
-    docker: "bioconductor/bioconductor_docker:RELEASE_3_17"
+    docker: "us.gcr.io/broad-dsp-lrma/deseq2:v1"
     memory: memory
     cpu: cpu
     disks: disk

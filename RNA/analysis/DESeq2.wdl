@@ -92,6 +92,10 @@ task RunDESeq2 {
     # Normalized Counts
     norm_counts <- counts(dds, normalized=TRUE)
     write.table(as.data.frame(norm_counts), file = paste0(prefix, "_normalized_counts.tsv"), sep = "\t", quote = FALSE)
+    missing_samples <- setdiff(rownames(meta), colnames(counts))
+    if (length(missing_samples) > 0) {
+      stop(paste("Samples in metadata but not in counts:", paste(missing_samples, collapse=", ")))
+    }
 
     # PCA Plot
     vsd <- vst(dds)

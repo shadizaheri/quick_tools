@@ -71,7 +71,7 @@ task RunDESeq2 {
     library(ggplot2)
 
     # Load counts
-    counts <- read.table(count_file, header = TRUE, row.names = 1, sep = "\t")
+    counts <- read.table(gzfile(count_file), header = TRUE, row.names = 1, sep = "\t", skip = 2)
     if ("Description" %in% colnames(counts)) {
       counts <- counts[, !(colnames(counts) %in% c("Description"))]
     }

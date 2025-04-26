@@ -101,18 +101,23 @@ task RunDESeq2 {
     norm_counts <- counts(dds, normalized=TRUE)
     write.table(as.data.frame(norm_counts), file = paste0(prefix, "_normalized_counts.tsv"), sep = "\t", quote = FALSE)
 
-    # PCA Plot
-    vsd <- vst(dds)
-    pcaData <- plotPCA(vsd, intgroup = "condition", returnData = TRUE)
-    percentVar <- round(100 * attr(pcaData, "percentVar"))
+    # PCA Plot (optional)
+    tryCatch({
+      vsd <- vst(dds)
+      pcaData <- plotPCA(vsd, intgroup = "condition", returnData = TRUE)
+      percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-    p <- ggplot(pcaData, aes(PC1, PC2, color=condition)) +
-      geom_point(size=3) +
-      xlab(paste0("PC1: ", percentVar[1], "% variance")) +
-      ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-      theme_minimal()
+      p <- ggplot(pcaData, aes(PC1, PC2, color=condition)) +
+        geom_point(size=3) +
+        xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+        ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+        theme_minimal()
 
-    ggsave(filename = paste0(prefix, "_pca_plot.pdf"), plot = p)
+      ggsave(filename = paste0(prefix, "_pca_plot.pdf"), plot = p)
+    }, error = function(e) {
+      cat("Warning: PCA plot failed but continuing. Error message:\n")
+      cat(e$message, "\n")
+    })
     ' > run_deseq2.R
 
     Rscript run_deseq2.R ~{count_matrix} ~{sample_metadata} ~{output_prefix} > deseq2.log 2>&1

@@ -59,7 +59,6 @@ task RunDESeq2 {
     String disk
     Int preemptible
   }
-
   command <<<
     echo '
     args <- commandArgs(trailingOnly = TRUE)
@@ -72,14 +71,19 @@ task RunDESeq2 {
 
     # Load counts
     counts <- read.table(gzfile(count_file), header = TRUE, row.names = 1, sep = "\t", skip = 2)
+
+    # If Description column exists, drop it
     if ("Description" %in% colnames(counts)) {
-      counts <- counts[, !(colnames(counts) %in% c("Description"))]
+      counts <- counts[, !(colnames(counts) %in% "Description")]
     }
+
+    # Also check and warn if Name/Description exist as columns somehow
+    counts <- counts[, !colnames(counts) %in% c("Name", "Description")]
 
     # Load metadata
     meta <- read.table(meta_file, header = TRUE, row.names = 1, sep = "\t")
 
-    # Check sample consistency BEFORE subsetting
+    # Check sample consistency
     missing_samples <- setdiff(rownames(meta), colnames(counts))
     if (length(missing_samples) > 0) {
       stop(paste("Samples in metadata but not in counts:", paste(missing_samples, collapse=", ")))

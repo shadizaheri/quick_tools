@@ -70,12 +70,13 @@ task RunDESeq2 {
     library(ggplot2)
 
     # Load counts
-    counts <- read.table(gzfile(count_file), header = TRUE, row.names = 1, sep = "\t", skip = 2)
+    counts <- read.table(gzfile(count_file), header = TRUE, row.names = 1, sep = "\t", skip = 2, check.names = FALSE)
 
-    # If Description column exists, drop it
+    # Drop "Description" column if exists
     if ("Description" %in% colnames(counts)) {
       counts <- counts[, !(colnames(counts) %in% "Description")]
     }
+
 
     # Also check and warn if Name/Description exist as columns somehow
     counts <- counts[, !colnames(counts) %in% c("Name", "Description")]

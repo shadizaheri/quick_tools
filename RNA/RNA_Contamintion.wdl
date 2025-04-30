@@ -1,74 +1,82 @@
 version 1.0
+# Author: Shadi Zaheri
+# Description: Workflow for RNA-seq contamination analysis
+
 
 workflow RNAContaminationWorkflow {
-
-  # Input Parameters
   input {
-    File fastq_file     # RNA-Seq reads (FASTQ file)
-    File reference_fasta # Reference genome (FASTA)
-    File sites_vcf      # Known SNP sites (VCF)
-    File ref_flat       # Reference flat file for RNA-SeQC
-    File kraken2_db     # Kraken2 database
-    File bam_file       # Aligned RNA BAM file
+    File   fastq_file
+    File   reference_fasta
+    File   sites_vcf
+    File   ref_flat
+    String sample_id
+    File   bam_file
+    File   bamixchecker_sites_bed
 
-    # User-adjustable resource parameters with default values
-    Int fastqc_memory_gb = 2  # Default: 2 GB for FastQC
-    Int fastqc_disk_gb = 10    # Default: 10 GB for FastQC
-    Int kraken2_memory_gb = 8  # Default: 8 GB for Kraken2
-    Int kraken2_disk_gb = 50    # Default: 50 GB for Kraken2
-    Int rnaseqc_memory_gb = 4  # Default: 4 GB for RNA-SeQC
-    Int rnaseqc_disk_gb = 20    # Default: 20 GB for RNA-SeQC
-    Int verifybamid2_memory_gb = 8  # Default: 8 GB for VerifyBamID2
-    Int verifybamid2_disk_gb = 30    # Default: 30 GB for VerifyBamID2
+    File   kraken2_db              # <— ADDED!
+    Int    fastqc_memory_gb       = 2
+    Int    fastqc_disk_gb         = 10
+    Int    kraken2_memory_gb      = 8
+    Int    kraken2_disk_gb        = 50
+    Int    rnaseqc_memory_gb      = 4
+    Int    rnaseqc_disk_gb        = 20
+    Int    verifybamid2_memory_gb = 8
+    Int    verifybamid2_disk_gb   = 30
+    Int    bamixchecker_memory_gb = 4
+    Int    bamixchecker_disk_gb   = 20
   }
 
-  # Run FastQC
   call FastQC {
     input:
       fastq_file = fastq_file,
-      memory_gb = fastqc_memory_gb,
-      disk_gb = fastqc_disk_gb
+      memory_gb  = fastqc_memory_gb,
+      disk_gb    = fastqc_disk_gb
   }
 
-  # Run Kraken2
   call Kraken2 {
     input:
       fastq_file = fastq_file,
       kraken2_db = kraken2_db,
-      memory_gb = kraken2_memory_gb,
-      disk_gb = kraken2_disk_gb
+      memory_gb  = kraken2_memory_gb,
+      disk_gb    = kraken2_disk_gb
   }
 
-  # Run Picard RNA-SeQC
+  
   call RNASeQC {
     input:
       bam_file = bam_file,
       reference_fasta = reference_fasta,
       ref_flat = ref_flat,
-      memory_gb = rnaseqc_memory_gb,  # Use Elvis operator to provide default
-      disk_gb = rnaseqc_disk_gb      # Use Elvis operator to provide default
+      memory_gb = rnaseqc_memory_gb,
+      disk_gb = rnaseqc_disk_gb
   }
 
-  # Run VerifyBamID2
   call VerifyBamID2 {
     input:
       bam_file = bam_file,
       sites_vcf = sites_vcf,
       reference_fasta = reference_fasta,
-      memory_gb = verifybamid2_memory_gb,  # Use Elvis operator to provide default
-      disk_gb = verifybamid2_disk_gb      # Use Elvis operator to provide default
+      memory_gb = verifybamid2_memory_gb,
+      disk_gb = verifybamid2_disk_gb
   }
 
-  # Outputs
+  call BamixChecker {
+    input:
+      bam_file = bam_file,
+      sites_bed = bamixchecker_sites_bed,
+      memory_gb = bamixchecker_memory_gb,
+      disk_gb = bamixchecker_disk_gb
+  }
+
   output {
     File fastqc_report = FastQC.fastqc_report
     File kraken2_report = Kraken2.kraken2_report
     File rnaseqc_metrics = RNASeQC.metrics_file
     File verifybamid2_output = VerifyBamID2.output_file
+    File bamixchecker_output = BamixChecker.contamination_file
   }
 }
 
-### FastQC Task ###
 task FastQC {
   input {
     File fastq_file
@@ -81,7 +89,7 @@ task FastQC {
   }
 
   output {
-    File fastqc_report = "${basename(fastq_file)}_fastqc.zip"
+    File fastqc_report = glob("*_fastqc.zip")[0]
   }
 
   runtime {
@@ -92,18 +100,21 @@ task FastQC {
   }
 }
 
-### Kraken2 Task ###
 task Kraken2 {
   input {
-    File fastq_file
-    File kraken2_db
-    Int memory_gb
-    Int disk_gb
+    File   fastq_file
+    File   kraken2_db
+    Int    memory_gb
+    Int    disk_gb
   }
 
-  command {
-    kraken2 --db ${kraken2_db} --report kraken2_report.txt --output kraken2_output.txt ${fastq_file}
-  }
+  command <<<                                
+    kraken2 \
+      --db ${kraken2_db} \
+      --report kraken2_report.txt \
+      --output kraken2_output.txt \
+      ${fastq_file}
+  >>>
 
   output {
     File kraken2_report = "kraken2_report.txt"
@@ -111,24 +122,24 @@ task Kraken2 {
 
   runtime {
     docker: "biocontainers/kraken2:v2.1.2"
-    cpu: 4
+    cpu:    4
     memory: "${memory_gb}G"
-    disks: "local-disk ${disk_gb} HDD"
+    disks:  "local-disk ${disk_gb} HDD"
   }
 }
 
-### RNA-SeQC Task ###
+
 task RNASeQC {
   input {
     File bam_file
     File reference_fasta
     File ref_flat
-    Int memory_gb = 4  # Default value if not provided
-    Int disk_gb = 20    # Default value if not provided
+    Int memory_gb = 4
+    Int disk_gb = 20
   }
 
   command {
-    java -jar /path/to/picard.jar CollectRnaSeqMetrics \
+    picard CollectRnaSeqMetrics \
       I=${bam_file} \
       O=rnaseqc_metrics.txt \
       REF_FLAT=${ref_flat} \
@@ -148,14 +159,13 @@ task RNASeQC {
   }
 }
 
-### VerifyBamID2 Task ###
 task VerifyBamID2 {
   input {
     File bam_file
     File sites_vcf
     File reference_fasta
-    Int memory_gb = 8  # Default value if not provided
-    Int disk_gb = 30    # Default value if not provided
+    Int memory_gb = 8
+    Int disk_gb = 30
   }
 
   command {
@@ -174,3 +184,26 @@ task VerifyBamID2 {
   }
 }
 
+task BamixChecker {
+  input {
+    File bam_file
+    File sites_bed
+    Int memory_gb
+    Int disk_gb
+  }
+
+  command {
+    bamixchecker --bam ${bam_file} --sites ${sites_bed} --out contamination_bamixchecker.txt
+  }
+
+  output {
+    File contamination_file = "contamination_bamixchecker.txt"
+  }
+
+  runtime {
+    docker: "maxplanck/bamixchecker:v1.0.1"
+    cpu: 2
+    memory: "${memory_gb}G"
+    disks: "local-disk ${disk_gb} HDD"
+  }
+}

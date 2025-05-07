@@ -5,7 +5,7 @@ task count_clips {
     File bam_file
     Int cpu = 2
     String memory = "4G"
-    String disks = "local-disk 100 GSSD"
+    String disks = "local-disk 100 SSD"
   }
 
   command {

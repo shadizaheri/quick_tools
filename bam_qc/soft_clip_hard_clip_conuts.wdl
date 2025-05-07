@@ -28,7 +28,7 @@ task count_clips {
   }
 
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/gtex_v8_star_2.7.10a_custom"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     cpu: cpu
     memory: memory
     disks: disks

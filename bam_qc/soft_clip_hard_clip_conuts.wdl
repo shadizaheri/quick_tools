@@ -11,12 +11,34 @@ task count_clips {
   command {
     set -e
 
-    soft=$(samtools view ${bam_file} | grep -cE '[0-9]+S')
+    # Primary reads (neither 0x100 nor 0x800)
+    primary_soft=$(samtools view -F 0x100 -F 0x800 ${bam_file} \
+                  | cut -f6 | grep -cE '[0-9]+S')
+    primary_hard=$(samtools view -F 0x100 -F 0x800 ${bam_file} \
+                  | cut -f6 | grep -cE '[0-9]+H')
 
-    hard=$(samtools view ${bam_file} | grep -cE '[0-9]+H')
+    # Secondary reads (0x100 but not 0x800)
+    secondary_soft=$(samtools view -f 0x100 -F 0x800 ${bam_file} \
+                    | cut -f6 | grep -cE '[0-9]+S')
+    secondary_hard=$(samtools view -f 0x100 -F 0x800 ${bam_file} \
+                    | cut -f6 | grep -cE '[0-9]+H')
 
-    echo -e "file\tsoft_clipped_reads\thard_clipped_reads" > counts.tsv
-    echo -e "${bam_file}\t\$soft\t\$hard" >> counts.tsv
+    # Supplementary reads (0x800)
+    supp_soft=$(samtools view -f 0x800 ${bam_file} \
+               | cut -f6 | grep -cE '[0-9]+S')
+    supp_hard=$(samtools view -f 0x800 ${bam_file} \
+               | cut -f6 | grep -cE '[0-9]+H')
+
+    # Write header + one line of counts
+    printf "file\tprimary_soft\tprimary_hard\tsecondary_soft\tsecondary_hard\tsupplementary_soft\tsupplementary_hard\n" \
+      > counts.tsv
+
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+      "${bam_file}" \
+      "$primary_soft" "$primary_hard" \
+      "$secondary_soft" "$secondary_hard" \
+      "$supp_soft"   "$supp_hard"   \
+      >> counts.tsv
   }
 
   output {

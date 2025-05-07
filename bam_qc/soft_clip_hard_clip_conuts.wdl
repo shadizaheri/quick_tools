@@ -40,7 +40,7 @@ workflow count_clips_workflow {
     Array[File] bam_files
     Int cpu = 2
     String memory = "4G"
-    String disks = "local-disk 100 GSSD"
+    String disks = "local-disk 100 SSD"
   }
 
   scatter (bam in bam_files) {

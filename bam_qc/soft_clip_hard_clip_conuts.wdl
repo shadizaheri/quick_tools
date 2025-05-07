@@ -11,15 +11,11 @@ task count_clips {
   command {
     set -e
 
-    # Count soft‑clipped reads
     soft=$(samtools view ${bam_file} | grep -cE '[0-9]+S')
 
-    # Count hard‑clipped reads
     hard=$(samtools view ${bam_file} | grep -cE '[0-9]+H')
 
-    # Write header line
     echo -e "file\tsoft_clipped_reads\thard_clipped_reads" > counts.tsv
-    # Use shell variables for soft and hard; WDL variable for bam_file
     echo -e "${bam_file}\t\$soft\t\$hard" >> counts.tsv
   }
 

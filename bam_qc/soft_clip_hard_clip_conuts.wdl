@@ -2,9 +2,8 @@ version 1.0
 
 task count_clips {
   input {
-    File bam                # CRAM or BAM
-    File bam_index          # .crai or .bai
-    File? reference = ""    # FASTA; required if reading CRAM
+    File bam           # BAM file
+    File bam_index     # .bai
     Int cpu = 1
     Int memory_gb = 4
     Int disk_gb   = 10
@@ -14,17 +13,13 @@ task count_clips {
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1) Bind the WDL‐interpolated path to a bash var
+# Bind WDL path
 bam_path="${bam}"
 
-# 2) Build samtools command
+# Build samtools command (no -T)
 samtools_cmd=( samtools view -@ ${cpu} )
-# Only add -T if it's a CRAM _and_ reference was provided
-if [[ "\${bam_path##*.}" == "cram" && -n "${reference}" ]]; then
-  samtools_cmd+=( -T "${reference}" )
-fi
 
-# 3) Single‐pass count via awk
+# Single‑pass count via awk
 printf 'type\tcount\n' > counts.tsv
 "${samtools_cmd[@]}" "${bam_path}" | \
   awk '
@@ -41,7 +36,7 @@ printf 'type\tcount\n' > counts.tsv
     }
   ' >> counts.tsv
 
-# 4) Split out individual values
+# Extract individual counts
 awk 'NR==2{print $2 > "soft_clipped.txt"}
      NR==3{print $2 > "hard_clipped.txt"}
      NR==4{print $2 > "secondary_supplementary.txt"}' counts.tsv
@@ -68,22 +63,24 @@ workflow clip_counter {
   input {
     File bam_file
     File bam_index
-    Int memory_gb = 4
-    Int disk_gb   = 10
+    Int cpu        = 1
+    Int memory_gb  = 4
+    Int disk_gb    = 10
   }
 
   call count_clips {
     input:
-      bam       = bam_file,
-      bam_index = bam_index,
-      memory_gb = memory_gb,
-      disk_gb   = disk_gb
+      bam        = bam_file,
+      bam_index  = bam_index,
+      cpu        = cpu,
+      memory_gb  = memory_gb,
+      disk_gb    = disk_gb
   }
 
   output {
     File counts_tsv             = count_clips.counts_tsv
-    Int soft_clipped            = count_clips.soft_clipped
-    Int hard_clipped            = count_clips.hard_clipped
-    Int secondary_supplementary = count_clips.secondary_supplementary
+    Int  soft_clipped           = count_clips.soft_clipped
+    Int  hard_clipped           = count_clips.hard_clipped
+    Int  secondary_supplementary= count_clips.secondary_supplementary
   }
 }

@@ -2,53 +2,65 @@ version 1.0
 
 task count_clips {
   input {
-    File bam             # CRAM or BAM file
-    File bam_index       # corresponding index (.crai or .bai)
-    Int memory_gb        # Runtime memory in GB
-    Int disk_gb          # Runtime disk size in GB
+    File bam                # CRAM or BAM
+    File bam_index          # .crai or .bai
+    File? reference = ""    # FASTA; required if reading CRAM
+    Int cpu = 1
+    Int memory_gb = 4
+    Int disk_gb   = 10
   }
 
   command <<<
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Count soft‑clipped reads
-soft=$(samtools view "${bam}" | grep -cE '[0-9]+S')
+# 1) Bind the WDL‐interpolated path to a bash var
+bam_path="${bam}"
 
-# Count hard‑clipped reads
-hard=$(samtools view "${bam}" | grep -cE '[0-9]+H')
+# 2) Build samtools command
+samtools_cmd=( samtools view -@ ${cpu} )
+# Only add -T if it's a CRAM _and_ reference was provided
+if [[ "\${bam_path##*.}" == "cram" && -n "${reference}" ]]; then
+  samtools_cmd+=( -T "${reference}" )
+fi
 
-# Count secondary or supplementary alignments (flag 0x100 or 0x800)
-sec_sup=$(samtools view "${bam}" | awk '{ if ((and($2,0x100)) || (and($2,0x800))) c++ } END { print c+0 }')
+# 3) Single‐pass count via awk
+printf 'type\tcount\n' > counts.tsv
+"${samtools_cmd[@]}" "${bam_path}" | \
+  awk '
+    BEGIN { soft=hard=sec=0 }
+    {
+      if ($6 ~ /[0-9]+S/) soft++
+      if ($6 ~ /[0-9]+H/) hard++
+      if (($2 & 0x100) || ($2 & 0x800)) sec++
+    }
+    END {
+      print "soft_clipped\t" soft
+      print "hard_clipped\t" hard
+      print "secondary_supplementary\t" sec
+    }
+  ' >> counts.tsv
 
-# Write combined TSV
-cat <<EOF > counts.tsv
-"type\tcount"
-"soft_clipped\t${soft}"
-"hard_clipped\t${hard}"
-"secondary_supplementary\t${sec_sup}"
-EOF
-
-# Write individual count files
-printf "%d" ${soft}    > soft_clipped.txt
-printf "%d" ${hard}    > hard_clipped.txt
-printf "%d" ${sec_sup} > secondary_supplementary.txt
+# 4) Split out individual values
+awk 'NR==2{print $2 > "soft_clipped.txt"}
+     NR==3{print $2 > "hard_clipped.txt"}
+     NR==4{print $2 > "secondary_supplementary.txt"}' counts.tsv
 
 echo "Counts written to counts.tsv"
 >>>
 
   output {
-    File counts_tsv             = "counts.tsv"
-    Int soft_clipped            = read_int("soft_clipped.txt")
-    Int hard_clipped            = read_int("hard_clipped.txt")
-    Int secondary_supplementary = read_int("secondary_supplementary.txt")
+    File   counts_tsv             = "counts.tsv"
+    Int    soft_clipped            = read_int("soft_clipped.txt")
+    Int    hard_clipped            = read_int("hard_clipped.txt")
+    Int    secondary_supplementary = read_int("secondary_supplementary.txt")
   }
 
   runtime {
     docker: "us.gcr.io/broad-dsp-lrma/gtex_v8_star_2.7.10a_custom"
-    cpu: 1
+    cpu:    cpu
     memory: "${memory_gb} GB"
-    disks: "local-disk ${disk_gb} SSD"
+    disks:  "local-disk ${disk_gb} SSD"
   }
 }
 

@@ -5,7 +5,7 @@ task count_clips {
     File bam_file
     Int cpu = 2
     String memory = "4G"
-    String disks = "local-disk 100 SSD"
+    String disks = "local-disk 50 HDD"
   }
 
   command {
@@ -28,7 +28,7 @@ task count_clips {
   }
 
   runtime {
-    docker: "biocontainers/samtools:v1.9-4-deb_cv1"
+    docker: "us.gcr.io/broad-dsp-lrma/gtex_v8_star_2.7.10a_custom"
     cpu: cpu
     memory: memory
     disks: disks

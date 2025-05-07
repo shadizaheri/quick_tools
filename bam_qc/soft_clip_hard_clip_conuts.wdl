@@ -2,85 +2,58 @@ version 1.0
 
 task count_clips {
   input {
-    File bam           # BAM file
-    File bam_index     # .bai
-    Int cpu = 1
-    Int memory_gb = 4
-    Int disk_gb   = 10
+    File bam_file
+    Int cpu = 2
+    String memory = "4G"
+    String disks = "local-disk 100 GSSD"
   }
 
-  command <<<
-#!/usr/bin/env bash
-set -euo pipefail
+  command {
+    set -e
 
-# Bind WDL path
-bam_path="${bam}"
+    # Count soft‑clipped reads
+    soft=$(samtools view ${bam_file} | grep -cE '[0-9]+S')
 
-# Build samtools command (no -T)
-samtools_cmd=( samtools view -@ ${cpu} )
+    # Count hard‑clipped reads
+    hard=$(samtools view ${bam_file} | grep -cE '[0-9]+H')
 
-# Single‑pass count via awk
-printf 'type\tcount\n' > counts.tsv
-"${samtools_cmd[@]}" "${bam_path}" | \
-  awk '
-    BEGIN { soft=hard=sec=0 }
-    {
-      if ($6 ~ /[0-9]+S/) soft++
-      if ($6 ~ /[0-9]+H/) hard++
-      if (($2 & 0x100) || ($2 & 0x800)) sec++
-    }
-    END {
-      print "soft_clipped\t" soft
-      print "hard_clipped\t" hard
-      print "secondary_supplementary\t" sec
-    }
-  ' >> counts.tsv
-
-# Extract individual counts
-awk 'NR==2{print $2 > "soft_clipped.txt"}
-     NR==3{print $2 > "hard_clipped.txt"}
-     NR==4{print $2 > "secondary_supplementary.txt"}' counts.tsv
-
-echo "Counts written to counts.tsv"
->>>
+    # Write header line
+    echo -e "file\tsoft_clipped_reads\thard_clipped_reads" > counts.tsv
+    # Use shell variables for soft and hard; WDL variable for bam_file
+    echo -e "${bam_file}\t\$soft\t\$hard" >> counts.tsv
+  }
 
   output {
-    File   counts_tsv             = "counts.tsv"
-    Int    soft_clipped            = read_int("soft_clipped.txt")
-    Int    hard_clipped            = read_int("hard_clipped.txt")
-    Int    secondary_supplementary = read_int("secondary_supplementary.txt")
+    File counts = "counts.tsv"
   }
 
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/gtex_v8_star_2.7.10a_custom"
-    cpu:    cpu
-    memory: "${memory_gb} GB"
-    disks:  "local-disk ${disk_gb} SSD"
+    docker: "biocontainers/samtools:v1.9-4-deb_cv1"
+    cpu: cpu
+    memory: memory
+    disks: disks
   }
 }
 
-workflow clip_counter {
+workflow count_clips_workflow {
   input {
-    File bam_file
-    File bam_index
-    Int cpu        = 1
-    Int memory_gb  = 4
-    Int disk_gb    = 10
+    Array[File] bam_files
+    Int cpu = 2
+    String memory = "4G"
+    String disks = "local-disk 100 GSSD"
   }
 
-  call count_clips {
-    input:
-      bam        = bam_file,
-      bam_index  = bam_index,
-      cpu        = cpu,
-      memory_gb  = memory_gb,
-      disk_gb    = disk_gb
+  scatter (bam in bam_files) {
+    call count_clips {
+      input:
+        bam_file = bam,
+        cpu       = cpu,
+        memory    = memory,
+        disks     = disks
+    }
   }
 
   output {
-    File counts_tsv             = count_clips.counts_tsv
-    Int  soft_clipped           = count_clips.soft_clipped
-    Int  hard_clipped           = count_clips.hard_clipped
-    Int  secondary_supplementary= count_clips.secondary_supplementary
+    Array[File] counts_reports = count_clips.counts
   }
 }

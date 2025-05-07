@@ -45,7 +45,7 @@ echo "Counts written to counts.tsv"
   }
 
   runtime {
-    docker: "quay.io/biocontainers/samtools:1.17--h2e538c0_1"
+    docker: "us.gcr.io/broad-dsp-lrma/gtex_v8_star_2.7.10a_custom"
     cpu: 1
     memory: "${memory_gb} GB"
     disks: "local-disk ${disk_gb} SSD"

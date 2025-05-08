@@ -12,8 +12,15 @@ task count_clips {
 
   command {
     set -e
+    # DEBUG: print what reference_fasta is and list that dir
+    echo ">> reference_fasta = '${reference_fasta}'" >&2
+    echo ">> listing its directory:" >&2
+    ls -l "$(dirname "${reference_fasta}")" >&2
 
-    # point samtools at your FASTA (the .fai will be next to it)
+    # DEBUG: try to open the FASTA index
+    samtools faidx "${reference_fasta}" 2>&1 | head -n5 >&2
+
+
     REF_OPTS="-T ${reference_fasta}"
 
     # Primary reads (neither secondary 0x100 nor supplementary 0x800)
@@ -45,7 +52,7 @@ task count_clips {
       "$supp_soft"   "$supp_hard"   \
       >> counts.tsv
   }
-
+## there is a pronlem with the reference?!
   output {
     File counts = "counts.tsv"
   }

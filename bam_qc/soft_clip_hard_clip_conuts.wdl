@@ -13,7 +13,7 @@ task count_clips {
   command {
     set -e
 
-    # define a shell var – WDL won’t try to interpolate $REF_OPTS
+    # point samtools at your FASTA (the .fai will be next to it)
     REF_OPTS="-T ${reference_fasta}"
 
     # Primary reads (neither secondary 0x100 nor supplementary 0x800)
@@ -34,7 +34,7 @@ task count_clips {
     supp_hard=$(samtools view $REF_OPTS -f 0x800 ${bam_or_cram} \
                | cut -f6 | grep -cE '[0-9]+H')
 
-    # emit one TSV line with all six counts
+    # write header + one line of counts
     printf "file\tprimary_soft\tprimary_hard\tsecondary_soft\tsecondary_hard\tsupplementary_soft\tsupplementary_hard\n" \
       > counts.tsv
 

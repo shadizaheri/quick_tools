@@ -2,7 +2,8 @@ version 1.0
 
 task merge_crams {
   input {
-    Array[File] cram_files
+    File cram_1
+    File cram_2
     File reference_fasta
     File reference_fasta_index
     String output_name = "merged.cram"
@@ -13,7 +14,7 @@ task merge_crams {
 
   command <<<
     set -e
-    samtools merge -O cram -@ ~{cpu} -R ~{reference_fasta} -o ~{output_name} ~{sep=' ' cram_files}
+    samtools merge -O cram -@ ~{cpu} -R ~{reference_fasta} -o ~{output_name} ~{cram_1} ~{cram_2}
   >>>
 
   output {
@@ -28,16 +29,18 @@ task merge_crams {
   }
 }
 
-workflow merge_crams_workflow {
+workflow merge_two_crams_workflow {
   input {
-    Array[File] cram_files
+    File cram_1
+    File cram_2
     File reference_fasta
     File reference_fasta_index
   }
 
   call merge_crams {
     input:
-      cram_files = cram_files,
+      cram_1 = cram_1,
+      cram_2 = cram_2,
       reference_fasta = reference_fasta,
       reference_fasta_index = reference_fasta_index
   }
@@ -46,4 +49,3 @@ workflow merge_crams_workflow {
     File final_merged_cram = merge_crams.merged_cram
   }
 }
-

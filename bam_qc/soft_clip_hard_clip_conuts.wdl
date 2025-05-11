@@ -68,7 +68,7 @@ task count_clips {
   }
 
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3" #"us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     cpu: cpu
     memory: memory
     disks: disks

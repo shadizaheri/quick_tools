@@ -21,7 +21,7 @@ task merge_crams {
   }
 
   runtime {
-    docker: "biocontainers/samtools:v1.17-1-deb_cv1"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3"
     cpu: cpu
     memory: memory
     disks: disks

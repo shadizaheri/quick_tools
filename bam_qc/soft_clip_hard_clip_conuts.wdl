@@ -2,9 +2,7 @@ version 1.0
 
 task count_clips {
   input {
-    File bam_or_cram
-    File reference_fasta
-    File reference_fasta_index
+    File bam_file
     Int cpu = 2
     String memory = "4G"
     String disks = "local-disk 50 HDD"
@@ -12,47 +10,46 @@ task count_clips {
 
   command {
     set -e
-    # DEBUG: print what reference_fasta is and list that dir
-    echo ">> reference_fasta = '${reference_fasta}'" >&2
-    echo ">> listing its directory:" >&2
-    ls -l "$(dirname "${reference_fasta}")" >&2
+    # Ensure input exists
+    FILE=\"${bam_file}\"
+    if [[ ! -f \"$FILE\" ]]; then
+      echo "Error: File not found: $FILE" >&2
+      exit 2
+    fi
 
-    # DEBUG: try to open the FASTA index
-    samtools faidx "${reference_fasta}" 2>&1 | head -n5 >&2
+    # Function to count clipped reads
+    count_clips() {
+      local label=$1
+      local flags=$2
 
+    # count soft‑clips in CIGAR
+    local soft=$(samtools view $flags "${FILE}" \
+      | cut -f6 \
+      | grep -cE '[0-9]+S')
 
-    REF_OPTS="-T ${reference_fasta}"
+    # count hard‑clips in CIGAR
+  local hard=$(samtools view $flags "${FILE}" \
+    | cut -f6 \
+    | grep -cE '[0-9]+H')
 
-    # Primary reads (neither secondary 0x100 nor supplementary 0x800)
-    primary_soft=$(samtools view $REF_OPTS -F 0x100 -F 0x800 ${bam_or_cram} \
-                  | cut -f6 | grep -cE '[0-9]+S')
-    primary_hard=$(samtools view $REF_OPTS -F 0x100 -F 0x800 ${bam_or_cram} \
-                  | cut -f6 | grep -cE '[0-9]+H')
+  echo "${label} — Soft-clips: $soft; Hard-clips: $hard"
+}
 
-    # Secondary reads (0x100 but not 0x800)
-    secondary_soft=$(samtools view $REF_OPTS -f 0x100 -F 0x800 ${bam_or_cram} \
-                    | cut -f6 | grep -cE '[0-9]+S')
-    secondary_hard=$(samtools view $REF_OPTS -f 0x100 -F 0x800 ${bam_or_cram} \
-                    | cut -f6 | grep -cE '[0-9]+H')
+# Run counts and write to TSV
+{
+  count_clips "Primary"     "-F 0x100 -F 0x800"
+  count_clips "Secondary"   "-f 0x100 -F 0x800"
+  count_clips "Supplementary" "-f 0x800"
+} > counts.tsv
 
-    # Supplementary reads (0x800)
-    supp_soft=$(samtools view $REF_OPTS -f 0x800 ${bam_or_cram} \
-               | cut -f6 | grep -cE '[0-9]+S')
-    supp_hard=$(samtools view $REF_OPTS -f 0x800 ${bam_or_cram} \
-               | cut -f6 | grep -cE '[0-9]+H')
+    soft=$(samtools view ${bam_file} | grep -cE '[0-9]+S')
 
-    # write header + one line of counts
-    printf "file\tprimary_soft\tprimary_hard\tsecondary_soft\tsecondary_hard\tsupplementary_soft\tsupplementary_hard\n" \
-      > counts.tsv
+    hard=$(samtools view ${bam_file} | grep -cE '[0-9]+H')
 
-    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
-      "${bam_or_cram}" \
-      "$primary_soft" "$primary_hard" \
-      "$secondary_soft" "$secondary_hard" \
-      "$supp_soft"   "$supp_hard"   \
-      >> counts.tsv
+    echo -e "file\tsoft_clipped_reads\thard_clipped_reads" > counts.tsv
+    echo -e "${bam_file}\t\$soft\t\$hard" >> counts.tsv
   }
-## there is a pronlem with the reference?!
+
   output {
     File counts = "counts.tsv"
   }
@@ -68,8 +65,6 @@ task count_clips {
 workflow count_clips_workflow {
   input {
     Array[File] bam_files
-    File reference_fasta
-    File reference_fasta_index
     Int cpu = 2
     String memory = "4G"
     String disks = "local-disk 100 SSD"
@@ -78,12 +73,10 @@ workflow count_clips_workflow {
   scatter (bam in bam_files) {
     call count_clips {
       input:
-        bam_or_cram           = bam,
-        reference_fasta       = reference_fasta,
-        reference_fasta_index = reference_fasta_index,
-        cpu                   = cpu,
-        memory                = memory,
-        disks                 = disks
+        bam_file = bam,
+        cpu       = cpu,
+        memory    = memory,
+        disks     = disks
     }
   }
 

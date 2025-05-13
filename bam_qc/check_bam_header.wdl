@@ -71,11 +71,11 @@ task SampleReadNames {
   output {
     File qnames_txt = "~{sample_name}_qnames.txt"
   }
-
   runtime {
     docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3"
     cpu: 1
     memory: "1G"
     disks: "local-disk ~{disk_space}"
+    continueOnReturnCode: [0, 141]
   }
 }

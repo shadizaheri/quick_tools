@@ -29,7 +29,7 @@ task ExtractHeader {
   command {
     set -euo pipefail
     echo "Extracting header for ~{sample_name}"
-    gsutil cat ~{cram_file} | samtools view -H - | grep -E '^@RG|^@PG' > "~{sample_name}_header.txt"
+    samtools view -H ~{cram_file} | grep -E '^@RG|^@PG' > "~{sample_name}_header.txt"
   }
 
   output {
@@ -43,4 +43,5 @@ task ExtractHeader {
     disks: "local-disk ~{disk_space}"
   }
 }
+
 

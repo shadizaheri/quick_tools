@@ -43,24 +43,23 @@ task count_clips {
     count_clips() {
       local label=$1
       local flags=$2
+
       local soft=$(samtools view $flags "$FILE" \
-        | cut -f6 | grep -cE '[0-9]+S')
+        | cut -f6 \
+        | grep -cE '[0-9]+S')
+
       local hard=$(samtools view $flags "$FILE" \
-        | cut -f6 | grep -cE '[0-9]+H')
-      echo -e "$label\t$soft\t$hard"
+        | cut -f6 \
+        | grep -cE '[0-9]+H')
+
+      echo -e "$label reads — Soft-clips: $soft; Hard-clips: $hard"
     }
 
-    # Header line
-    echo -e "category\tsoft_clipped_reads\thard_clipped_reads" > counts.tsv
-
-    # Primary (neither secondary nor supplementary)
-    count_clips "Primary"   "-F 0x100 -F 0x800" >> counts.tsv
-
-    # Secondary (0x100 but not 0x800)
-    count_clips "Secondary" "-f 0x100 -F 0x800" >> counts.tsv
-
-    # Supplementary (0x800)
-    count_clips "Supplementary" "-f 0x800" >> counts.tsv
+    {
+      count_clips "Primary"     "-F 0x100 -F 0x800"
+      count_clips "Secondary"   "-f 0x100 -F 0x800"
+      count_clips "Supplementary" "-f 0x800"
+    } > counts.tsv
   >>>
 
   output {
@@ -68,7 +67,7 @@ task count_clips {
   }
 
   runtime {
-    docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3" #"us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-gcloud-samtools:0.1.3"
     cpu: cpu
     memory: memory
     disks: disks

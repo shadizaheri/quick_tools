@@ -1,348 +1,208 @@
 version 1.0
 
-## VerifyBamID2 Workflow for Short Read CRAM Files
-## This workflow runs VerifyBamID2 contamination estimation on CRAM files
+## VerifyBamID2 Workflow for Contamination Detection
+## 
+## This workflow runs VerifyBamID2 to detect DNA sample contamination in CRAM files.
+## VerifyBamID2 estimates the proportion of reads from a different individual than 
+## the supposed source by comparing allele frequencies at known variant sites.
+##
+## Input Requirements:
+## - CRAM file and its index (.crai)
+## - Reference genome (FASTA, index, and dictionary)
+## - SNP VCF file with common variants and its index
+## - Sample identifier for output naming
+##
+## Outputs:
+## - .selfSM file containing contamination metrics
+## - Log file with detailed run information
 
-workflow VerifyBamID2Workflow {
-    input {
-        File input_cram
-        File input_crai
-        File reference_fasta
-        File reference_fasta_index
-        File? reference_dict
-        File svd_prefix_bed
-        File svd_prefix_mu
-        File svd_prefix_UD
-        String sample_name
-        
-        # Optional parameters
-        Float? contamination_threshold = 0.02
-        Int? max_depth = 200
-        Int? min_mapq = 20
-        Int? min_baseq = 20
-        String? extra_args = ""
-        
-        # Runtime parameters
-        String docker_image = "griffan/verifybamid2:2.0.1"
-        Int cpu = 4
-        Int memory_gb = 8
-        Int disk_size_gb = 100
-        Int preemptible_tries = 2
-    }
+workflow RunVerifyBamID2 {
+  input {
+    File cram                    # Input CRAM alignment file
+    File crai                    # CRAM index file (.crai)
+    File ref_fasta              # Reference genome FASTA file
+    File ref_fasta_index        # Reference FASTA index (.fai)
+    File ref_dict               # Reference dictionary file (.dict)
+    File snp_vcf                # VCF file with SNP sites for contamination checking
+    File snp_vcf_index          # VCF index file (.tbi or .csi)
+    String sample_id            # Sample identifier for output file naming
+    String docker_image = "us.gcr.io/broad-dsp-lrma/verifybamid2:v2.0.1"  # Docker container image
+  }
+  
+  # Call the main task to run VerifyBamID2
+  call VerifyBamID2Task {
+    input:
+      cram = cram,
+      crai = crai,
+      ref_fasta = ref_fasta,
+      snp_vcf = snp_vcf,
+      snp_vcf_index = snp_vcf_index,
+      sample_id = sample_id,
+      docker_image = docker_image
+  }
+  
+  # Workflow outputs
+  output {
+    File contamination_metrics = VerifyBamID2Task.contamination_metrics
+    File log_file = VerifyBamID2Task.log_file
+  }
 
-    call VerifyBamID2 {
-        input:
-            input_cram = input_cram,
-            input_crai = input_crai,
-            reference_fasta = reference_fasta,
-            reference_fasta_index = reference_fasta_index,
-            reference_dict = reference_dict,
-            svd_prefix_bed = svd_prefix_bed,
-            svd_prefix_mu = svd_prefix_mu,
-            svd_prefix_UD = svd_prefix_UD,
-            sample_name = sample_name,
-            contamination_threshold = contamination_threshold,
-            max_depth = max_depth,
-            min_mapq = min_mapq,
-            min_baseq = min_baseq,
-            extra_args = extra_args,
-            docker_image = docker_image,
-            cpu = cpu,
-            memory_gb = memory_gb,
-            disk_size_gb = disk_size_gb,
-            preemptible_tries = preemptible_tries
-    }
-
-    output {
-        File selfSM = VerifyBamID2.selfSM
-        File ancestry = VerifyBamID2.ancestry
-        File depthSM = VerifyBamID2.depthSM
-        Float contamination = VerifyBamID2.contamination
-        Float contamination_error = VerifyBamID2.contamination_error
-        Boolean is_contaminated = VerifyBamID2.is_contaminated
-        File log_file = VerifyBamID2.log_file
-    }
-
-    meta {
-        description: "Run VerifyBamID2 contamination estimation on CRAM files"
-        author: "Your Name"
-        email: "your.email@example.com"
-    }
-
-    parameter_meta {
-        input_cram: "Input CRAM file"
-        input_crai: "Input CRAM index file (.crai)"
-        reference_fasta: "Reference genome FASTA file"
-        reference_fasta_index: "Reference genome FASTA index (.fai)"
-        reference_dict: "Reference genome dictionary file (.dict)"
-        svd_prefix_bed: "VerifyBamID2 SVD resource BED file"
-        svd_prefix_mu: "VerifyBamID2 SVD resource MU file"
-        svd_prefix_UD: "VerifyBamID2 SVD resource UD file"
-        sample_name: "Sample name for output files"
-        contamination_threshold: "Contamination threshold for flagging samples"
-        max_depth: "Maximum depth for pileup"
-        min_mapq: "Minimum mapping quality"
-        min_baseq: "Minimum base quality"
-        docker_image: "Docker image for VerifyBamID2"
-        cpu: "Number of CPUs"
-        memory_gb: "Memory in GB"
-        disk_size_gb: "Disk size in GB"
-    }
-}
-
-task VerifyBamID2 {
-    input {
-        File input_cram
-        File input_crai
-        File reference_fasta
-        File reference_fasta_index
-        File? reference_dict
-        File svd_prefix_bed
-        File svd_prefix_mu
-        File svd_prefix_UD
-        String sample_name
-        
-        Float? contamination_threshold
-        Int? max_depth
-        Int? min_mapq
-        Int? min_baseq
-        String? extra_args
-        
-        String docker_image
-        Int cpu
-        Int memory_gb
-        Int disk_size_gb
-        Int preemptible_tries
-    }
-
-    String base_name = basename(input_cram, ".cram")
-    String output_prefix = sample_name + ".verifybamid2"
+  # Workflow metadata
+  meta {
+    description: "Runs VerifyBamID2 to detect DNA sample contamination in CRAM files"
+    version: "1.0"
+    author: "Broad Institute"
+    email: "support@broadinstitute.org"
+    keywords: ["contamination", "quality-control", "genomics", "verifybamid2"]
     
-    command <<<
-        set -euo pipefail
-        
-        # Create output directory
-        mkdir -p outputs
-        
-        # Link input files with proper naming
-        ln -s ~{input_cram} input.cram
-        ln -s ~{input_crai} input.cram.crai
-        ln -s ~{reference_fasta} reference.fa
-        ln -s ~{reference_fasta_index} reference.fa.fai
-        
-        # Link dictionary if provided
-        ~{if defined(reference_dict) then "ln -s " + reference_dict + " reference.dict" else ""}
-        
-        # Get the base name for SVD files (remove extension)
-        SVD_PREFIX=$(basename ~{svd_prefix_bed} .bed)
-        
-        # Link SVD resource files
-        ln -s ~{svd_prefix_bed} ${SVD_PREFIX}.bed
-        ln -s ~{svd_prefix_mu} ${SVD_PREFIX}.mu
-        ln -s ~{svd_prefix_UD} ${SVD_PREFIX}.UD
-        
-        # Run VerifyBamID2
-        VerifyBamID \
-            --Verbose \
-            --NumPC 4 \
-            --Output outputs/~{output_prefix} \
-            --BamFile input.cram \
-            --Reference reference.fa \
-            --UDPath . \
-            --MeanPath . \
-            --BedPath . \
-            ~{"--MaxDepth " + max_depth} \
-            ~{"--MinMapQ " + min_mapq} \
-            ~{"--MinQ " + min_baseq} \
-            ~{extra_args} \
-            --SVDPrefix ${SVD_PREFIX} \
-            2>&1 | tee verifybamid2.log
-        
-        # Extract contamination values
-        CONTAMINATION=$(awk 'NR==2 {print $7}' outputs/~{output_prefix}.selfSM)
-        CONTAMINATION_ERROR=$(awk 'NR==2 {print $8}' outputs/~{output_prefix}.selfSM)
-        
-        # Check if contamination exceeds threshold
-        THRESHOLD=~{default="0.02" contamination_threshold}
-        IS_CONTAMINATED=$(python3 -c "print('true' if float('${CONTAMINATION}') > float('${THRESHOLD}') else 'false')")
-        
-        # Write results to files for output
-        echo ${CONTAMINATION} > contamination.txt
-        echo ${CONTAMINATION_ERROR} > contamination_error.txt
-        echo ${IS_CONTAMINATED} > is_contaminated.txt
-        
-        # Log summary
-        echo "Sample: ~{sample_name}" >> verifybamid2.log
-        echo "Contamination: ${CONTAMINATION}" >> verifybamid2.log
-        echo "Contamination Error: ${CONTAMINATION_ERROR}" >> verifybamid2.log
-        echo "Is Contaminated (>${THRESHOLD}): ${IS_CONTAMINATED}" >> verifybamid2.log
-    >>>
+    # External references
+    verifybamid2_paper: "https://genome.cshlp.org/content/22/5/1053"
+    verifybamid2_github: "https://github.com/Griffan/VerifyBamID"
+    
+    # Typical runtime for various input sizes
+    runtime_notes: "Runtime typically 5-30 minutes depending on CRAM size and SNP density"
+  }
 
-    runtime {
-        docker: docker_image
-        cpu: cpu
-        memory: memory_gb + " GB"
-        disks: "local-disk " + disk_size_gb + " HDD"
-        preemptible: preemptible_tries
-        bootDiskSizeGb: 15
+  # Parameter descriptions for workflow inputs
+  parameter_meta {
+    cram: {
+      description: "Input CRAM alignment file to check for contamination",
+      category: "required",
+      help: "Must be properly aligned to the same reference genome used in ref_fasta"
     }
-
-    output {
-        File selfSM = "outputs/" + output_prefix + ".selfSM"
-        File ancestry = "outputs/" + output_prefix + ".ancestry"
-        File depthSM = "outputs/" + output_prefix + ".depthSM"
-        Float contamination = read_float("contamination.txt")
-        Float contamination_error = read_float("contamination_error.txt")
-        Boolean is_contaminated = read_boolean("is_contaminated.txt")
-        File log_file = "verifybamid2.log"
+    crai: {
+      description: "Index file for the input CRAM file",
+      category: "required", 
+      help: "Should have same base name as CRAM file with .crai extension"
     }
-
-    parameter_meta {
-        input_cram: "Input CRAM file"
-        input_crai: "CRAM index file"
-        reference_fasta: "Reference genome FASTA"
-        reference_fasta_index: "Reference FASTA index"
-        svd_prefix_bed: "SVD BED file for VerifyBamID2"
-        svd_prefix_mu: "SVD MU file for VerifyBamID2"
-        svd_prefix_UD: "SVD UD file for VerifyBamID2"
-        sample_name: "Sample identifier"
-        contamination_threshold: "Threshold for contamination flagging"
-        max_depth: "Maximum read depth for analysis"
-        min_mapq: "Minimum mapping quality filter"
-        min_baseq: "Minimum base quality filter"
-        docker_image: "Container image for VerifyBamID2"
-        cpu: "CPU cores"
-        memory_gb: "Memory allocation in GB"
-        disk_size_gb: "Disk space in GB"
+    ref_fasta: {
+      description: "Reference genome FASTA file used for alignment",
+      category: "required",
+      help: "Must match the reference used to create the CRAM file"
     }
+    ref_fasta_index: {
+      description: "FASTA index file (.fai) for the reference genome",
+      category: "required"
+    }
+    ref_dict: {
+      description: "Sequence dictionary file (.dict) for the reference genome", 
+      category: "required",
+      help: "Can be created with Picard CreateSequenceDictionary"
+    }
+    snp_vcf: {
+      description: "VCF file containing SNP sites for contamination estimation",
+      category: "required",
+      help: "Should contain common population variants (e.g., from 1000 Genomes)"
+    }
+    snp_vcf_index: {
+      description: "Index file for the SNP VCF (.tbi or .csi)",
+      category: "required"
+    }
+    sample_id: {
+      description: "Identifier for the sample, used in output file naming",
+      category: "required",
+      help: "Should be unique and descriptive for the sample"
+    }
+    docker_image: {
+      description: "Docker container image containing VerifyBamID2",
+      category: "optional",
+      help: "Default uses latest Broad Institute VerifyBamID2 image"
+    }
+  }
 }
 
-# Workflow for processing multiple samples
-workflow VerifyBamID2BatchWorkflow {
-    input {
-        Array[File] input_crams
-        Array[File] input_crais
-        Array[String] sample_names
-        File reference_fasta
-        File reference_fasta_index
-        File? reference_dict
-        File svd_prefix_bed
-        File svd_prefix_mu
-        File svd_prefix_UD
-        
-        Float? contamination_threshold = 0.02
-        Int? max_depth = 200
-        Int? min_mapq = 20
-        Int? min_baseq = 20
-        String? extra_args = ""
-        
-        String docker_image = "griffan/verifybamid2:2.0.1"
-        Int cpu = 4
-        Int memory_gb = 8
-        Int disk_size_gb = 100
-        Int preemptible_tries = 2
-    }
+## Task to execute VerifyBamID2 contamination detection
+task VerifyBamID2Task {
+  input {
+    File cram                    # Input CRAM file
+    File crai                    # CRAM index file  
+    File ref_fasta              # Reference genome FASTA
+    File snp_vcf                # SNP VCF for contamination checking
+    File snp_vcf_index          # VCF index file
+    String sample_id            # Sample identifier
+    String docker_image         # Docker container image
+  }
+  
+  command {
+    set -e  # Exit on any error
+    
+    # Run VerifyBamID2 with verbose output
+    # --Verbose: Enable detailed logging
+    # --Bam: Input alignment file (works with CRAM too)
+    # --Reference: Reference genome FASTA
+    # --Site: VCF file with variant sites 
+    # --SiteIndex: VCF index file
+    # --Output: Output file prefix
+    verifybamid2 \
+      --Verbose \
+      --Bam ${cram} \
+      --Reference ${ref_fasta} \
+      --Site ${snp_vcf} \
+      --SiteIndex ${snp_vcf_index} \
+      --Output ${sample_id}
+  }
+  
+  # Task outputs
+  output {
+    File contamination_metrics = "${sample_id}.selfSM"    # Main contamination results
+    File log_file = "${sample_id}.log"                    # Detailed run log
+  }
+  
+  # Runtime configuration
+  runtime {
+    docker: docker_image        # Container with VerifyBamID2 installed
+    memory: "4G"                # Memory allocation
+    cpu: 2                      # CPU cores
+    disks: "local-disk 50 HDD"  # Disk space allocation
+    preemptible: 2              # Use preemptible instances to reduce cost
+    bootDiskSizeGb: 15          # Boot disk size
+  }
 
-    # Process each sample
-    scatter (i in range(length(input_crams))) {
-        call VerifyBamID2 {
-            input:
-                input_cram = input_crams[i],
-                input_crai = input_crais[i],
-                reference_fasta = reference_fasta,
-                reference_fasta_index = reference_fasta_index,
-                reference_dict = reference_dict,
-                svd_prefix_bed = svd_prefix_bed,
-                svd_prefix_mu = svd_prefix_mu,
-                svd_prefix_UD = svd_prefix_UD,
-                sample_name = sample_names[i],
-                contamination_threshold = contamination_threshold,
-                max_depth = max_depth,
-                min_mapq = min_mapq,
-                min_baseq = min_baseq,
-                extra_args = extra_args,
-                docker_image = docker_image,
-                cpu = cpu,
-                memory_gb = memory_gb,
-                disk_size_gb = disk_size_gb,
-                preemptible_tries = preemptible_tries
-        }
-    }
+  # Task metadata
+  meta {
+    description: "Runs VerifyBamID2 to estimate DNA contamination from sequencing data"
+    help: "VerifyBamID2 estimates contamination by comparing observed vs expected allele frequencies"
+    contamination_metrics_description: "Tab-delimited file with contamination estimates and statistics"
+    log_file_description: "Detailed log file with runtime information and potential errors"
+    FREEMIX_column: "Estimated contamination fraction (0-1)"
+    FREELK1_column: "Log-likelihood of estimated contamination"
+    FREELK0_column: "Log-likelihood of no contamination"
+    CHIPMIX_column: "Contamination estimate from array data (if available)"
+    SNPS_column: "Number of SNPs used for estimation"
+    READS_column: "Number of reads examined"
+    AVG_DP_column: "Average depth at examined sites"
+  }
 
-    # Aggregate results
-    call CollectResults {
-        input:
-            selfSM_files = VerifyBamID2.selfSM,
-            sample_names = sample_names,
-            contamination_values = VerifyBamID2.contamination,
-            contamination_errors = VerifyBamID2.contamination_error,
-            is_contaminated_flags = VerifyBamID2.is_contaminated,
-            contamination_threshold = contamination_threshold
+  # Task parameter descriptions
+  parameter_meta {
+    cram: {
+      description: "Input CRAM alignment file",
+      stream: true,
+      help: "File will be streamed to reduce storage requirements"
     }
-
-    output {
-        Array[File] selfSM_files = VerifyBamID2.selfSM
-        Array[File] ancestry_files = VerifyBamID2.ancestry
-        Array[File] depthSM_files = VerifyBamID2.depthSM
-        Array[Float] contamination_values = VerifyBamID2.contamination
-        Array[Boolean] is_contaminated_flags = VerifyBamID2.is_contaminated
-        File summary_report = CollectResults.summary_report
-        File contaminated_samples = CollectResults.contaminated_samples
+    crai: {
+      description: "CRAM index file enabling random access",
+      localization_optional: false
     }
-}
-
-task CollectResults {
-    input {
-        Array[File] selfSM_files
-        Array[String] sample_names
-        Array[Float] contamination_values
-        Array[Float] contamination_errors
-        Array[Boolean] is_contaminated_flags
-        Float? contamination_threshold
+    ref_fasta: {
+      description: "Reference genome in FASTA format",
+      help: "Must match reference used for CRAM alignment"
     }
-
-    command <<<
-        set -euo pipefail
-        
-        # Create summary report
-        echo -e "Sample\tContamination\tContamination_Error\tIs_Contaminated\tThreshold" > summary_report.txt
-        
-        # Process arrays
-        SAMPLES=(~{sep=" " sample_names})
-        CONTAMINATION=(~{sep=" " contamination_values})
-        CONTAMINATION_ERROR=(~{sep=" " contamination_errors})
-        IS_CONTAMINATED=(~{sep=" " is_contaminated_flags})
-        THRESHOLD=~{default="0.02" contamination_threshold}
-        
-        # Create contaminated samples list
-        echo "Contaminated Samples (threshold > ${THRESHOLD}):" > contaminated_samples.txt
-        echo "Sample\tContamination" >> contaminated_samples.txt
-        
-        for i in "${!SAMPLES[@]}"; do
-            echo -e "${SAMPLES[$i]}\t${CONTAMINATION[$i]}\t${CONTAMINATION_ERROR[$i]}\t${IS_CONTAMINATED[$i]}\t${THRESHOLD}" >> summary_report.txt
-            
-            if [ "${IS_CONTAMINATED[$i]}" = "true" ]; then
-                echo -e "${SAMPLES[$i]}\t${CONTAMINATION[$i]}" >> contaminated_samples.txt
-            fi
-        done
-        
-        # Count contaminated samples
-        CONTAMINATED_COUNT=$(grep -c "true" summary_report.txt || echo "0")
-        TOTAL_COUNT=${#SAMPLES[@]}
-        
-        echo "" >> contaminated_samples.txt
-        echo "Summary: ${CONTAMINATED_COUNT}/${TOTAL_COUNT} samples contaminated" >> contaminated_samples.txt
-    >>>
-
-    runtime {
-        docker: "ubuntu:20.04"
-        cpu: 1
-        memory: "2 GB"
-        disks: "local-disk 10 HDD"
+    snp_vcf: {
+      description: "VCF file with variant sites for contamination estimation",
+      help: "Common variants work best (MAF > 0.05 recommended)"
     }
-
-    output {
-        File summary_report = "summary_report.txt"
-        File contaminated_samples = "contaminated_samples.txt"
+    snp_vcf_index: {
+      description: "Tabix index for the SNP VCF file"
     }
+    sample_id: {
+      description: "Sample identifier used for output file naming",
+      pattern: "[A-Za-z0-9_-]+",
+      help: "Should contain only alphanumeric characters, underscores, and hyphens"
+    }
+    docker_image: {
+      description: "Docker image containing VerifyBamID2 software",
+      default: "us.gcr.io/broad-dsp-lrma/verifybamid2:v2.0.1"
+    }
+  }
 }

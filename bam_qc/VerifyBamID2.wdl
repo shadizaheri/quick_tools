@@ -123,10 +123,10 @@ task VerifyBamID2Task {
     String docker_image         # Docker container image
   }
   
-  command {
+  command <<<
     set -e  # Exit on any error
     
-    # Run VerifyBamID2 with verbose output
+    # Run VerifyBamID2 with verbose output and capture log
     # --Verbose: Enable detailed logging
     # --Bam: Input alignment file (works with CRAM too)
     # --Reference: Reference genome FASTA
@@ -135,12 +135,22 @@ task VerifyBamID2Task {
     # --Output: Output file prefix
     verifybamid2 \
       --Verbose \
-      --Bam ${cram} \
-      --Reference ${ref_fasta} \
-      --Site ${snp_vcf} \
-      --SiteIndex ${snp_vcf_index} \
-      --Output ${sample_id}
-  }
+      --Bam ~{cram} \
+      --Reference ~{ref_fasta} \
+      --Site ~{snp_vcf} \
+      --SiteIndex ~{snp_vcf_index} \
+      --Output ~{sample_id} \
+      2>&1 | tee ~{sample_id}.log
+      
+    # Ensure the selfSM file was created
+    if [[ ! -f "~{sample_id}.selfSM" ]]; then
+      echo "ERROR: VerifyBamID2 did not produce expected output file ~{sample_id}.selfSM" | tee -a ~{sample_id}.log
+      exit 1
+    fi
+    
+    # Log completion
+    echo "VerifyBamID2 completed successfully at $(date)" | tee -a ~{sample_id}.log
+  >>>
   
   # Task outputs
   output {

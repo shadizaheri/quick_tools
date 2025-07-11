@@ -36,9 +36,18 @@ workflow FilterAndMergeVCFs {
       output_name = tissue_name + "_merged.vcf.gz"
   }
 
+  call UploadMergedToGCS {
+    input:
+      merged_vcf = MergeAndIndexVCFs.merged_vcf,
+      merged_vcf_index = MergeAndIndexVCFs.merged_vcf_index,
+      gcs_output_prefix = gcs_output_prefix,
+      tissue_name = tissue_name
+  }
+
   output {
     File merged_vcf = MergeAndIndexVCFs.merged_vcf
     File merged_vcf_index = MergeAndIndexVCFs.merged_vcf_index
+    String merged_vcf_gcs_path = UploadMergedToGCS.merged_vcf_gcs_path
   }
 }
 
@@ -49,11 +58,9 @@ task ExtractAndFilterVCF {
   }
 
   command <<<
-    gsutil cp ${gcs_input_prefix}/${sample_id}/${sample_id}.hard-filtered.vcf.gz .
-    gsutil cp ${gcs_input_prefix}/${sample_id}/${sample_id}.hard-filtered.vcf.gz.tbi .
     bcftools view \
       -i 'FORMAT/AD[0:1]/(FORMAT/AD[0:0]+FORMAT/AD[0:1]) > 0.35 && FORMAT/AD[0:1]/(FORMAT/AD[0:0]+FORMAT/AD[0:1]) < 0.65' \
-      ${sample_id}.hard-filtered.vcf.gz -Oz -o ${sample_id}_HET.vcf.gz
+      ${gcs_input_prefix}/${sample_id}/${sample_id}.hard-filtered.vcf.gz -Oz -o ${sample_id}_HET.vcf.gz
     tabix -p vcf ${sample_id}_HET.vcf.gz
   >>>
 
@@ -62,7 +69,7 @@ task ExtractAndFilterVCF {
   }
 
   runtime {
-    docker: "google/cloud-sdk:slim"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     memory: "2G"
     cpu: 1
   }
@@ -84,7 +91,7 @@ task FixPloidyAndBgzip {
   }
 
   runtime {
-    docker: "quay.io/biocontainers/bcftools:1.20--h7e0c702_0"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     memory: "2G"
     cpu: 1
   }
@@ -130,9 +137,32 @@ task MergeAndIndexVCFs {
   }
 
   runtime {
-    docker: "quay.io/biocontainers/bcftools:1.20--h7e0c702_0"
+    docker: "us.gcr.io/broad-dsp-lrma/lr-align:0.1.28"
     memory: "4G"
     cpu: 2
   }
 }
 
+task UploadMergedToGCS {
+  input {
+    File merged_vcf
+    File merged_vcf_index
+    String gcs_output_prefix
+    String tissue_name
+  }
+
+  command <<<
+    gsutil cp ${merged_vcf} ${gcs_output_prefix}/${tissue_name}_merged.vcf.gz
+    gsutil cp ${merged_vcf_index} ${gcs_output_prefix}/${tissue_name}_merged.vcf.gz.tbi
+  >>>
+
+  output {
+    String merged_vcf_gcs_path = "${gcs_output_prefix}/${tissue_name}_merged.vcf.gz"
+  }
+
+  runtime {
+    docker: "google/cloud-sdk:slim"
+    memory: "1G"
+    cpu: 1
+  }
+}

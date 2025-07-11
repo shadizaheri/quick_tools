@@ -135,4 +135,4 @@ task MergeAndIndexVCFs {
     cpu: 2
   }
 }
-7:32
+

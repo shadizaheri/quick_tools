@@ -1,0 +1,11 @@
+FROM broadinstitute/gatk:latest
+
+# Install pigz for faster compression
+RUN apt-get update && \
+    apt-get install -y pigz && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /data
+
+# Keep the default GATK entrypoint
+

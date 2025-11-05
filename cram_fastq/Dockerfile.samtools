@@ -17,3 +17,4 @@ WORKDIR /data
 
 ENTRYPOINT ["samtools"]
 
+

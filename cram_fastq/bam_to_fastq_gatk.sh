@@ -114,3 +114,4 @@ echo "  ${OUTPUT_PREFIX}_1.fastq.gz"
 echo "  ${OUTPUT_PREFIX}_2.fastq.gz"
 echo "  ${OUTPUT_PREFIX}_unpaired.fastq.gz"
 
+
